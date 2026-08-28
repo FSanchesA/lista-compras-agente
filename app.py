@@ -8,6 +8,7 @@ import traceback
 import requests
 
 from urllib.parse import urlencode
+from difflib import SequenceMatcher
 
 
 app = Flask(__name__)
@@ -37,6 +38,53 @@ INDEX_PRODUTOS = (
 
 
 # =========================================================
+# NORMALIZAÇÃO DE TEXTO
+# =========================================================
+
+def normalizar_texto(texto):
+
+    if texto is None:
+        return ""
+
+    texto = str(texto).lower()
+
+    substituicoes = {
+        "á": "a",
+        "à": "a",
+        "ã": "a",
+        "â": "a",
+        "é": "e",
+        "ê": "e",
+        "í": "i",
+        "ó": "o",
+        "ô": "o",
+        "õ": "o",
+        "ú": "u",
+        "ç": "c"
+    }
+
+    for origem, destino in substituicoes.items():
+        texto = texto.replace(
+            origem,
+            destino
+        )
+
+    texto = re.sub(
+        r"[^a-z0-9\s]",
+        " ",
+        texto
+    )
+
+    texto = re.sub(
+        r"\s+",
+        " ",
+        texto
+    )
+
+    return texto.strip()
+
+
+# =========================================================
 # PREFERÊNCIAS
 # =========================================================
 
@@ -53,48 +101,160 @@ def parse_preferencias(texto):
 
     preferencias = []
 
-    for parte in partes:
+    for indice, parte in enumerate(
+        partes,
+        start=1
+    ):
 
-        match = re.search(
-            r"(.+?)\s+at[eé]\s+R?\$?\s*([\d,.]+)",
+        limite = None
+
+        match_preco = re.search(
+            r"at[eé]\s+R?\$?\s*([\d,.]+)",
             parte,
             re.IGNORECASE
         )
 
-        if match:
+        if match_preco:
 
-            termo = match.group(1).strip()
-
-            limite = (
-                match
-                .group(2)
+            valor = (
+                match_preco
+                .group(1)
                 .replace(".", "")
                 .replace(",", ".")
             )
 
             try:
-                limite = float(limite)
+                limite = float(valor)
 
             except Exception:
                 limite = None
 
-            preferencias.append(
-                {
-                    "termo": termo,
-                    "limite": limite
-                }
-            )
+
+            descricao = re.sub(
+                r"\s*at[eé]\s+R?\$?\s*[\d,.]+",
+                "",
+                parte,
+                flags=re.IGNORECASE
+            ).strip()
 
         else:
 
-            preferencias.append(
-                {
-                    "termo": parte,
-                    "limite": None
-                }
-            )
+            descricao = parte.strip()
+
+
+        preferencias.append(
+            {
+                "prioridade":
+                    indice,
+
+                "descricao":
+                    descricao,
+
+                "limite":
+                    limite
+            }
+        )
 
     return preferencias
+
+
+# =========================================================
+# EXTRAIR TAMANHO DA PREFERÊNCIA
+# =========================================================
+
+def extrair_tamanho(texto):
+
+    if not texto:
+        return None
+
+    texto_norm = normalizar_texto(
+        texto
+    )
+
+    padroes = [
+
+        (
+            r"(\d+(?:[.,]\d+)?)\s*kg",
+            "KG",
+            1
+        ),
+
+        (
+            r"(\d+(?:[.,]\d+)?)\s*g",
+            "G",
+            1
+        ),
+
+        (
+            r"(\d+(?:[.,]\d+)?)\s*l",
+            "L",
+            1
+        ),
+
+        (
+            r"(\d+(?:[.,]\d+)?)\s*ml",
+            "ML",
+            1
+        )
+
+    ]
+
+
+    for padrao, tipo, fator in padroes:
+
+        match = re.search(
+            padrao,
+            texto_norm
+        )
+
+        if match:
+
+            valor = (
+                match
+                .group(1)
+                .replace(",", ".")
+            )
+
+            try:
+
+                return {
+                    "valor":
+                        float(valor) * fator,
+
+                    "tipo":
+                        tipo
+                }
+
+            except Exception:
+
+                return None
+
+    return None
+
+
+# =========================================================
+# REMOVER TAMANHO DA DESCRIÇÃO
+# =========================================================
+
+def remover_tamanho(texto):
+
+    if not texto:
+        return ""
+
+    texto = re.sub(
+        r"\b\d+(?:[.,]\d+)?\s*(kg|g|l|ml)\b",
+        " ",
+        texto,
+        flags=re.IGNORECASE
+    )
+
+    texto = re.sub(
+        r"\s+",
+        " ",
+        texto
+    )
+
+    return texto.strip()
 
 
 # =========================================================
@@ -449,6 +609,429 @@ def buscar_produtos_api(
 
 
 # =========================================================
+# VERIFICAR TAMANHO
+# =========================================================
+
+def tamanho_compativel(
+    produto,
+    tamanho
+):
+
+    if not tamanho:
+        return True
+
+
+    medida_produto = produto.get(
+        "medida"
+    )
+
+    tipo_produto = produto.get(
+        "tipo_medida"
+    )
+
+
+    if (
+        medida_produto is None
+        or tipo_produto is None
+    ):
+
+        return False
+
+
+    try:
+
+        medida_produto = float(
+            medida_produto
+        )
+
+    except Exception:
+
+        return False
+
+
+    valor_preferencia = float(
+        tamanho[
+            "valor"
+        ]
+    )
+
+    tipo_preferencia = (
+        tamanho[
+            "tipo"
+        ]
+    )
+
+
+    if tipo_produto == tipo_preferencia:
+
+        return abs(
+            medida_produto -
+            valor_preferencia
+        ) < 0.01
+
+
+    if (
+        tipo_produto == "G"
+        and tipo_preferencia == "KG"
+    ):
+
+        return abs(
+            medida_produto -
+            (
+                valor_preferencia *
+                1000
+            )
+        ) < 1
+
+
+    if (
+        tipo_produto == "KG"
+        and tipo_preferencia == "G"
+    ):
+
+        return abs(
+            (
+                medida_produto *
+                1000
+            ) -
+            valor_preferencia
+        ) < 1
+
+
+    if (
+        tipo_produto == "ML"
+        and tipo_preferencia == "L"
+    ):
+
+        return abs(
+            medida_produto -
+            (
+                valor_preferencia *
+                1000
+            )
+        ) < 1
+
+
+    if (
+        tipo_produto == "L"
+        and tipo_preferencia == "ML"
+    ):
+
+        return abs(
+            (
+                medida_produto *
+                1000
+            ) -
+            valor_preferencia
+        ) < 1
+
+
+    return False
+
+
+# =========================================================
+# PONTUAÇÃO DE CORRESPONDÊNCIA
+# =========================================================
+
+def pontuar_produto(
+    produto,
+    descricao_preferencia
+):
+
+    descricao_sem_tamanho = (
+        remover_tamanho(
+            descricao_preferencia
+        )
+    )
+
+    termo = normalizar_texto(
+        descricao_sem_tamanho
+    )
+
+
+    texto_produto = normalizar_texto(
+        " ".join(
+            [
+                str(
+                    produto.get(
+                        "marca",
+                        ""
+                    )
+                ),
+
+                str(
+                    produto.get(
+                        "nome",
+                        ""
+                    )
+                )
+            ]
+        )
+    )
+
+
+    if not termo:
+
+        return 0
+
+
+    palavras = [
+        p
+        for p in termo.split()
+        if p
+    ]
+
+
+    acertos = sum(
+        1
+        for palavra in palavras
+        if palavra in texto_produto
+    )
+
+
+    proporcao_palavras = (
+        acertos /
+        len(
+            palavras
+        )
+        if palavras
+        else 0
+    )
+
+
+    similaridade = (
+        SequenceMatcher(
+            None,
+            termo,
+            texto_produto
+        )
+        .ratio()
+    )
+
+
+    return (
+        proporcao_palavras *
+        0.8
+        +
+        similaridade *
+        0.2
+    )
+
+
+# =========================================================
+# ESCOLHER PRODUTO PELA PREFERÊNCIA
+# =========================================================
+
+def escolher_por_preferencia(
+    item,
+    preferencias,
+    produtos
+):
+
+    for preferencia in preferencias:
+
+        descricao = preferencia.get(
+            "descricao",
+            ""
+        )
+
+        limite = preferencia.get(
+            "limite"
+        )
+
+        prioridade = preferencia.get(
+            "prioridade"
+        )
+
+
+        tamanho = extrair_tamanho(
+            descricao
+        )
+
+
+        candidatos = []
+
+
+        for produto in produtos:
+
+            if not produto.get(
+                "for_sale",
+                True
+            ):
+                continue
+
+
+            estoque = produto.get(
+                "estoque"
+            )
+
+
+            if (
+                estoque is not None
+                and estoque <= 0
+            ):
+                continue
+
+
+            if not tamanho_compativel(
+                produto,
+                tamanho
+            ):
+                continue
+
+
+            preco = produto.get(
+                "preco_efetivo"
+            )
+
+
+            if (
+                limite is not None
+                and (
+                    preco is None
+                    or preco > limite
+                )
+            ):
+                continue
+
+
+            score = pontuar_produto(
+                produto,
+                descricao
+            )
+
+
+            if score < 0.55:
+                continue
+
+
+            candidatos.append(
+                {
+                    "produto":
+                        produto,
+
+                    "score":
+                        score
+                }
+            )
+
+
+        if candidatos:
+
+            candidatos.sort(
+                key=lambda x: (
+                    -x[
+                        "score"
+                    ],
+                    x[
+                        "produto"
+                    ].get(
+                        "preco_efetivo"
+                    )
+                    or 999999
+                )
+            )
+
+
+            escolhido = candidatos[
+                0
+            ][
+                "produto"
+            ]
+
+
+            return {
+
+                "status":
+                    "PREFERENCIA_ATENDIDA",
+
+                "item":
+                    item,
+
+                "preferencia_atendida":
+                    prioridade,
+
+                "descricao_preferencia":
+                    descricao,
+
+                "limite_preco":
+                    limite,
+
+                "escolhido":
+                    escolhido,
+
+                "motivo":
+                    (
+                        f"Preferência nº {prioridade} "
+                        "atendida."
+                    )
+            }
+
+
+    return None
+
+
+# =========================================================
+# SUGESTÃO QUANDO PREFERÊNCIA NÃO É ATENDIDA
+# =========================================================
+
+def sugerir_alternativa(
+    item,
+    produtos
+):
+
+    disponiveis = [
+        p
+        for p in produtos
+        if (
+            p.get(
+                "for_sale",
+                True
+            )
+            and (
+                p.get(
+                    "estoque"
+                ) is None
+                or p.get(
+                    "estoque"
+                ) > 0
+            )
+            and p.get(
+                "preco_efetivo"
+            ) is not None
+        )
+    ]
+
+
+    if not disponiveis:
+
+        return None
+
+
+    disponiveis.sort(
+        key=lambda p: (
+            p.get(
+                "preco_por_medida"
+            )
+            if p.get(
+                "preco_por_medida"
+            ) is not None
+            else 999999,
+
+            p.get(
+                "preco_efetivo"
+            )
+            or 999999
+        )
+    )
+
+
+    return disponiveis[
+        0
+    ]
+
+
+# =========================================================
 # NAVEGADOR
 # =========================================================
 
@@ -532,7 +1115,7 @@ def home():
 
                 "/api-buscar?q=arroz",
 
-                "/api-buscar?q=cafe&limite=20",
+                "/testar-escolha?item=cafe&preferencias=Santa Clara 250g ate 13",
 
                 "/executar-compra"
 
@@ -543,7 +1126,7 @@ def home():
 
 
 # =========================================================
-# TESTE DO CHROMIUM
+# TESTE CHROMIUM
 # =========================================================
 
 @app.route(
@@ -610,7 +1193,7 @@ def teste():
 
 
 # =========================================================
-# TESTE DA API DIRETA
+# API BUSCAR
 # =========================================================
 
 @app.route(
@@ -682,6 +1265,176 @@ def api_buscar():
 
                 "resultado":
                     resultado
+
+            }
+        )
+
+
+    except Exception as e:
+
+        return jsonify(
+            {
+
+                "status":
+                    "erro",
+
+                "erro":
+                    str(e),
+
+                "trace":
+                    traceback.format_exc()
+
+            }
+        ), 500
+
+
+# =========================================================
+# TESTAR ESCOLHA
+# =========================================================
+
+@app.route(
+    "/testar-escolha",
+    methods=["GET"]
+)
+def testar_escolha():
+
+    item = request.args.get(
+        "item",
+        ""
+    ).strip()
+
+
+    preferencias_texto = (
+        request.args.get(
+            "preferencias",
+            ""
+        )
+        .strip()
+    )
+
+
+    if not item:
+
+        return jsonify(
+            {
+
+                "status":
+                    "erro",
+
+                "mensagem":
+                    "Informe o item."
+
+            }
+        ), 400
+
+
+    try:
+
+        preferencias = parse_preferencias(
+            preferencias_texto
+        )
+
+
+        busca = buscar_produtos_api(
+            item,
+            limite=30
+        )
+
+
+        produtos = busca.get(
+            "produtos",
+            []
+        )
+
+
+        escolha = None
+
+
+        if preferencias:
+
+            escolha = escolher_por_preferencia(
+                item,
+                preferencias,
+                produtos
+            )
+
+
+        if escolha:
+
+            return jsonify(
+                {
+
+                    "status":
+                        "ok",
+
+                    "resultado":
+                        escolha
+
+                }
+            )
+
+
+        alternativa = sugerir_alternativa(
+            item,
+            produtos
+        )
+
+
+        if alternativa:
+
+            return jsonify(
+                {
+
+                    "status":
+                        "ok",
+
+                    "resultado":
+                        {
+
+                            "status":
+                                "PREFERENCIA_NAO_ATENDIDA",
+
+                            "item":
+                                item,
+
+                            "preferencias":
+                                preferencias,
+
+                            "sugestao":
+                                alternativa,
+
+                            "motivo":
+                                (
+                                    "Nenhuma preferência "
+                                    "foi atendida. "
+                                    "Alternativa sugerida."
+                                )
+
+                        }
+
+                }
+            )
+
+
+        return jsonify(
+            {
+
+                "status":
+                    "ok",
+
+                "resultado":
+                    {
+
+                        "status":
+                            "NAO_ENCONTRADO",
+
+                        "item":
+                            item,
+
+                        "preferencias":
+                            preferencias
+
+                    }
 
             }
         )
@@ -785,32 +1538,72 @@ def executar_compra():
 
                 busca = buscar_produtos_api(
                     nome,
-                    limite=20
+                    limite=30
                 )
 
 
-                resultados.append(
-                    {
-
-                        "item":
-                            nome,
-
-                        "quantidade":
-                            quantidade,
-
-                        "preferencias":
-                            preferencias,
-
-                        "status":
-                            "pesquisado",
-
-                        "opcoes":
-                            busca[
-                                "produtos"
-                            ]
-
-                    }
+                produtos = busca.get(
+                    "produtos",
+                    []
                 )
+
+
+                escolha = None
+
+
+                if preferencias:
+
+                    escolha = escolher_por_preferencia(
+                        nome,
+                        preferencias,
+                        produtos
+                    )
+
+
+                if escolha:
+
+                    escolha[
+                        "quantidade"
+                    ] = quantidade
+
+
+                    resultados.append(
+                        escolha
+                    )
+
+
+                else:
+
+                    sugestao = sugerir_alternativa(
+                        nome,
+                        produtos
+                    )
+
+
+                    resultados.append(
+                        {
+
+                            "status":
+                                (
+                                    "PREFERENCIA_NAO_ATENDIDA"
+                                    if preferencias
+                                    else "SUGESTAO"
+                                ),
+
+                            "item":
+                                nome,
+
+                            "quantidade":
+                                quantidade,
+
+                            "preferencias":
+                                preferencias,
+
+                            "sugestao":
+                                sugestao
+
+                        }
+                    )
 
 
             except Exception as e:
@@ -818,17 +1611,14 @@ def executar_compra():
                 resultados.append(
                     {
 
+                        "status":
+                            "erro",
+
                         "item":
                             nome,
 
                         "quantidade":
                             quantidade,
-
-                        "preferencias":
-                            preferencias,
-
-                        "status":
-                            "erro",
 
                         "mensagem":
                             str(e)
