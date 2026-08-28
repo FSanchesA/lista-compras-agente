@@ -756,7 +756,7 @@ def produto_disponivel(
 
 
 # =========================================================
-# COMPATIBILIDADE DE TAMANHO
+# TAMANHO COMPATÍVEL
 # =========================================================
 
 def tamanho_compativel(
@@ -915,7 +915,7 @@ def preferencia_corresponde(
 
 
 # =========================================================
-# ESCOLHA POR PREFERÊNCIA
+# ESCOLHER POR PREFERÊNCIA
 # =========================================================
 
 def escolher_por_preferencia(
@@ -1025,7 +1025,7 @@ def escolher_por_preferencia(
 
 
 # =========================================================
-# NOVA CAMADA SEMÂNTICA
+# TERMOS SIGNIFICATIVOS
 # =========================================================
 
 PALAVRAS_IGNORADAS = {
@@ -1065,26 +1065,41 @@ def termos_significativos(
     ]
 
 
+# =========================================================
+# EQUIVALÊNCIA SEMÂNTICA RÍGIDA
+# =========================================================
+
 def equivalencia_semantica(
     item,
     produto
 ):
 
     """
-    Impede falsos positivos como:
+    Regra principal:
+
+    1 conceito:
+    pode aparecer no nome, categoria ou seção.
+
+    2 conceitos:
+    os dois precisam estar no NOME.
+
+    3+ conceitos:
+    os dois primeiros precisam estar no NOME
+    e pelo menos 75% dos termos totais também.
+
+    Exemplos:
 
     Peito de frango
-    -> Galinha inteira
+    -> precisa conter PEITO + FRANGO no nome.
+
+    Galinha Congelada Inteira
+    -> reprova.
+
+    Água micelar
+    -> precisa conter ÁGUA + MICELAR no nome.
 
     Papel manteiga
-    -> Manteiga
-
-    Creme dental infantil
-    -> Creme corporal
-
-    Quanto mais específico o termo,
-    mais conceitos precisam existir
-    no nome/categoria do produto.
+    -> precisa conter PAPEL + MANTEIGA no nome.
     """
 
     termos = termos_significativos(
@@ -1115,71 +1130,61 @@ def equivalencia_semantica(
         )
     )
 
-    departamento = normalizar_texto(
-        produto.get(
-            "departamento",
-            ""
-        )
-    )
-
-    texto_produto = (
-        nome +
-        " " +
-        categoria +
-        " " +
-        secao +
-        " " +
-        departamento
-    )
-
-    acertos = [
-        termo
-        for termo in termos
-        if termo in texto_produto
-    ]
-
-    # ---------------------------------------------
-    # 1 TERMO
-    # Ex.: Acetona
-    # ---------------------------------------------
+    # =====================================================
+    # UM CONCEITO
+    # =====================================================
 
     if len(
         termos
     ) == 1:
 
-        return len(
-            acertos
-        ) == 1
+        termo = termos[
+            0
+        ]
 
-    # ---------------------------------------------
-    # 2 TERMOS
-    # TODOS SÃO OBRIGATÓRIOS
-    #
-    # Peito de frango
-    # -> exige PEITO + FRANGO
-    #
-    # Água micelar
-    # -> exige AGUA + MICELAR
-    # ---------------------------------------------
+        return (
+            termo in nome
+            or termo in categoria
+            or termo in secao
+        )
+
+    # =====================================================
+    # DOIS CONCEITOS
+    # =====================================================
 
     if len(
         termos
     ) == 2:
 
-        return len(
-            acertos
-        ) == 2
+        return all(
+            termo in nome
+            for termo in termos
+        )
 
-    # ---------------------------------------------
-    # 3 OU MAIS TERMOS
-    # exige pelo menos 75%
-    # ---------------------------------------------
+    # =====================================================
+    # TRÊS OU MAIS CONCEITOS
+    # =====================================================
+
+    conceitos_principais = termos[
+        :2
+    ]
+
+    principais_ok = all(
+        termo in nome
+        for termo in conceitos_principais
+    )
+
+    if not principais_ok:
+        return False
+
+    acertos_nome = sum(
+        1
+        for termo in termos
+        if termo in nome
+    )
 
     proporcao = (
-        len(
-            acertos
-        )
-        /
+        acertos_nome /
         len(
             termos
         )
@@ -1189,7 +1194,7 @@ def equivalencia_semantica(
 
 
 # =========================================================
-# QUALIFICADORES
+# QUALIFICADORES ESPECIAIS
 # =========================================================
 
 QUALIFICADORES_ESPECIAIS = [
@@ -1237,20 +1242,6 @@ def penalidade_qualificadores(
     item,
     produto
 ):
-
-    """
-    Não exclui produtos especiais.
-    Apenas os penaliza quando o usuário
-    não pediu especificamente aquele atributo.
-
-    Ex.:
-    Peito de frango
-    -> peito cru/congelado vence peito defumado.
-
-    Água micelar
-    -> bifásica continua possível se for o
-       que realmente existe no mercado.
-    """
 
     termo_item = normalizar_texto(
         item
@@ -1510,8 +1501,6 @@ def escolher_melhor_custo_beneficio(
 
     # =====================================================
     # FILTRO SEMÂNTICO
-    #
-    # ESTA É A CORREÇÃO PRINCIPAL.
     # =====================================================
 
     semanticamente_validos = [
@@ -1523,17 +1512,15 @@ def escolher_melhor_custo_beneficio(
         )
     ]
 
-    # Se houver produtos semanticamente válidos,
-    # SOMENTE ELES entram no ranking.
     if semanticamente_validos:
 
         disponiveis = (
             semanticamente_validos
         )
 
-    # Se nenhum produto passar no filtro,
-    # mantemos os resultados originais como fallback,
-    # evitando que produtos raros simplesmente desapareçam.
+    # =====================================================
+    # MEDIDA DOMINANTE
+    # =====================================================
 
     tipo_dominante = (
         tipo_medida_dominante(
@@ -1549,6 +1536,10 @@ def escolher_melhor_custo_beneficio(
             disponiveis,
             tipo_dominante
         )
+
+    # =====================================================
+    # MENOR PREÇO ABSOLUTO
+    # =====================================================
 
     precos_absolutos = [
 
@@ -1571,6 +1562,10 @@ def escolher_melhor_custo_beneficio(
         if precos_absolutos
         else 1
     )
+
+    # =====================================================
+    # MENOR PREÇO POR MEDIDA
+    # =====================================================
 
     precos_medida = [
 
@@ -1699,7 +1694,7 @@ def escolher_melhor_custo_beneficio(
             penalidade_tamanho = 0.70
 
         # -----------------------------------------
-        # QUALIFICADORES ESPECIAIS
+        # QUALIFICADORES
         # -----------------------------------------
 
         penalidade_especial = (
@@ -1720,7 +1715,6 @@ def escolher_melhor_custo_beneficio(
 
         # -----------------------------------------
         # SEMÂNTICA
-        # fallback recebe penalidade alta
         # -----------------------------------------
 
         penalidade_semantica = (
@@ -1965,7 +1959,7 @@ def decidir_item(
         }
 
     # =====================================================
-    # COM PREFERÊNCIAS
+    # COM PREFERÊNCIA
     # =====================================================
 
     if preferencias:
@@ -2246,7 +2240,7 @@ def capturar_session_storage(
 
 
 # =========================================================
-# LOGIN
+# GERAR SESSÃO
 # =========================================================
 
 def gerar_sessao():
@@ -2981,7 +2975,7 @@ def home():
 
 
 # =========================================================
-# STATUS
+# STATUS DA SESSÃO
 # =========================================================
 
 @app.route(
@@ -3049,7 +3043,7 @@ def gerar_sessao_route():
 
 
 # =========================================================
-# ANALISAR
+# ANALISAR COMPRA
 # =========================================================
 
 @app.route(
