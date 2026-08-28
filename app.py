@@ -8,7 +8,6 @@ import traceback
 import requests
 
 from urllib.parse import urlencode
-from difflib import SequenceMatcher
 
 
 app = Flask(__name__)
@@ -159,7 +158,7 @@ def parse_preferencias(texto):
 
 
 # =========================================================
-# EXTRAIR TAMANHO DA PREFERÊNCIA
+# EXTRAIR TAMANHO
 # =========================================================
 
 def extrair_tamanho(texto):
@@ -171,36 +170,33 @@ def extrair_tamanho(texto):
         texto
     )
 
+
     padroes = [
 
         (
             r"(\d+(?:[.,]\d+)?)\s*kg",
-            "KG",
-            1
+            "KG"
         ),
 
         (
             r"(\d+(?:[.,]\d+)?)\s*g",
-            "G",
-            1
+            "G"
         ),
 
         (
             r"(\d+(?:[.,]\d+)?)\s*l",
-            "L",
-            1
+            "L"
         ),
 
         (
             r"(\d+(?:[.,]\d+)?)\s*ml",
-            "ML",
-            1
+            "ML"
         )
 
     ]
 
 
-    for padrao, tipo, fator in padroes:
+    for padrao, tipo in padroes:
 
         match = re.search(
             padrao,
@@ -219,7 +215,7 @@ def extrair_tamanho(texto):
 
                 return {
                     "valor":
-                        float(valor) * fator,
+                        float(valor),
 
                     "tipo":
                         tipo
@@ -233,7 +229,7 @@ def extrair_tamanho(texto):
 
 
 # =========================================================
-# REMOVER TAMANHO DA DESCRIÇÃO
+# REMOVER TAMANHO DO TEXTO
 # =========================================================
 
 def remover_tamanho(texto):
@@ -478,7 +474,7 @@ def normalizar_produto(produto):
 
 def buscar_produtos_api(
     termo,
-    limite=20,
+    limite=30,
     pagina=0
 ):
 
@@ -609,7 +605,7 @@ def buscar_produtos_api(
 
 
 # =========================================================
-# VERIFICAR TAMANHO
+# TAMANHO COMPATÍVEL
 # =========================================================
 
 def tamanho_compativel(
@@ -655,11 +651,9 @@ def tamanho_compativel(
         ]
     )
 
-    tipo_preferencia = (
-        tamanho[
-            "tipo"
-        ]
-    )
+    tipo_preferencia = tamanho[
+        "tipo"
+    ]
 
 
     if tipo_produto == tipo_preferencia:
@@ -730,91 +724,83 @@ def tamanho_compativel(
 
 
 # =========================================================
-# PONTUAÇÃO DE CORRESPONDÊNCIA
+# EXTRAIR PALAVRAS DA PREFERÊNCIA
 # =========================================================
 
-def pontuar_produto(
-    produto,
-    descricao_preferencia
+def palavras_preferencia(
+    descricao
 ):
 
-    descricao_sem_tamanho = (
-        remover_tamanho(
-            descricao_preferencia
-        )
+    descricao_sem_tamanho = remover_tamanho(
+        descricao
     )
 
-    termo = normalizar_texto(
+    texto = normalizar_texto(
         descricao_sem_tamanho
     )
 
+    palavras = [
+        p
+        for p in texto.split()
+        if len(p) >= 2
+    ]
 
-    texto_produto = normalizar_texto(
-        " ".join(
-            [
-                str(
-                    produto.get(
-                        "marca",
-                        ""
-                    )
-                ),
+    return palavras
 
-                str(
-                    produto.get(
-                        "nome",
-                        ""
-                    )
-                )
-            ]
-        )
+
+# =========================================================
+# SCORE DE COMPATIBILIDADE
+# =========================================================
+
+def score_compatibilidade(
+    produto,
+    descricao
+):
+
+    palavras = palavras_preferencia(
+        descricao
     )
 
-
-    if not termo:
-
+    if not palavras:
         return 0
 
 
-    palavras = [
-        p
-        for p in termo.split()
-        if p
-    ]
+    marca = normalizar_texto(
+        produto.get(
+            "marca",
+            ""
+        )
+    )
 
+    nome = normalizar_texto(
+        produto.get(
+            "nome",
+            ""
+        )
+    )
 
-    acertos = sum(
-        1
-        for palavra in palavras
-        if palavra in texto_produto
+    texto_produto = (
+        marca +
+        " " +
+        nome
     )
 
 
-    proporcao_palavras = (
+    acertos = 0
+
+
+    for palavra in palavras:
+
+        if palavra in texto_produto:
+
+            acertos += 1
+
+
+    return (
         acertos /
         len(
             palavras
         )
-        if palavras
-        else 0
-    )
-
-
-    similaridade = (
-        SequenceMatcher(
-            None,
-            termo,
-            texto_produto
-        )
-        .ratio()
-    )
-
-
-    return (
-        proporcao_palavras *
-        0.8
-        +
-        similaridade *
-        0.2
     )
 
 
@@ -858,6 +844,7 @@ def escolher_por_preferencia(
                 "for_sale",
                 True
             ):
+
                 continue
 
 
@@ -870,6 +857,7 @@ def escolher_por_preferencia(
                 estoque is not None
                 and estoque <= 0
             ):
+
                 continue
 
 
@@ -877,6 +865,7 @@ def escolher_por_preferencia(
                 produto,
                 tamanho
             ):
+
                 continue
 
 
@@ -885,23 +874,27 @@ def escolher_por_preferencia(
             )
 
 
-            if (
-                limite is not None
-                and (
-                    preco is None
-                    or preco > limite
-                )
-            ):
+            if preco is None:
+
                 continue
 
 
-            score = pontuar_produto(
+            if (
+                limite is not None
+                and preco > limite
+            ):
+
+                continue
+
+
+            score = score_compatibilidade(
                 produto,
                 descricao
             )
 
 
-            if score < 0.55:
+            if score <= 0:
+
                 continue
 
 
@@ -918,11 +911,33 @@ def escolher_por_preferencia(
 
         if candidatos:
 
-            candidatos.sort(
-                key=lambda x: (
-                    -x[
+            melhor_score = max(
+                candidato[
+                    "score"
+                ]
+                for candidato in candidatos
+            )
+
+
+            candidatos_melhor_score = [
+
+                candidato
+
+                for candidato
+                in candidatos
+
+                if abs(
+                    candidato[
                         "score"
-                    ],
+                    ] -
+                    melhor_score
+                ) < 0.0001
+
+            ]
+
+
+            candidatos_melhor_score.sort(
+                key=lambda x: (
                     x[
                         "produto"
                     ].get(
@@ -933,11 +948,13 @@ def escolher_por_preferencia(
             )
 
 
-            escolhido = candidatos[
-                0
-            ][
-                "produto"
-            ]
+            escolhido = (
+                candidatos_melhor_score[
+                    0
+                ][
+                    "produto"
+                ]
+            )
 
 
             return {
@@ -972,7 +989,7 @@ def escolher_por_preferencia(
 
 
 # =========================================================
-# SUGESTÃO QUANDO PREFERÊNCIA NÃO É ATENDIDA
+# SUGERIR ALTERNATIVA
 # =========================================================
 
 def sugerir_alternativa(
@@ -1337,7 +1354,7 @@ def testar_escolha():
 
         busca = buscar_produtos_api(
             item,
-            limite=30
+            limite=50
         )
 
 
@@ -1538,7 +1555,7 @@ def executar_compra():
 
                 busca = buscar_produtos_api(
                     nome,
-                    limite=30
+                    limite=50
                 )
 
 
