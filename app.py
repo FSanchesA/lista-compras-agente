@@ -11,6 +11,10 @@ app = Flask(__name__)
 MATEUS_URL = "https://mateusmais.com.br/loja/supermercado-mateus-cohama"
 
 
+# =========================================================
+# PREFERÊNCIAS
+# =========================================================
+
 def parse_preferencias(texto):
 
     if not texto:
@@ -37,13 +41,15 @@ def parse_preferencias(texto):
             termo = match.group(1).strip()
 
             limite = (
-                match.group(2)
+                match
+                .group(2)
                 .replace(".", "")
                 .replace(",", ".")
             )
 
             try:
                 limite = float(limite)
+
             except Exception:
                 limite = None
 
@@ -66,6 +72,10 @@ def parse_preferencias(texto):
     return preferencias
 
 
+# =========================================================
+# PREÇO
+# =========================================================
+
 def extrair_preco(texto):
 
     if not texto:
@@ -80,7 +90,8 @@ def extrair_preco(texto):
         return None
 
     valor = (
-        match.group(1)
+        match
+        .group(1)
         .replace(".", "")
         .replace(",", ".")
     )
@@ -91,6 +102,10 @@ def extrair_preco(texto):
     except Exception:
         return None
 
+
+# =========================================================
+# NAVEGADOR
+# =========================================================
 
 def criar_browser(playwright):
 
@@ -116,6 +131,10 @@ def criar_pagina(browser):
     )
 
 
+# =========================================================
+# ABRIR MATEUS
+# =========================================================
+
 def abrir_mateus(page):
 
     page.goto(
@@ -133,6 +152,40 @@ def abrir_mateus(page):
         "url": page.url
     }
 
+
+# =========================================================
+# LOGIN
+# =========================================================
+
+def login_mateus(page):
+
+    usuario = os.getenv(
+        "MATEUS_LOGIN"
+    )
+
+    senha = os.getenv(
+        "MATEUS_SENHA"
+    )
+
+    if not usuario or not senha:
+
+        raise Exception(
+            "Credenciais do Mateus não configuradas."
+        )
+
+    abrir_mateus(
+        page
+    )
+
+    return {
+        "status":
+            "login_pendente_validacao"
+    }
+
+
+# =========================================================
+# PESQUISA
+# =========================================================
 
 def executar_busca(
     page,
@@ -169,11 +222,20 @@ def executar_busca(
     )
 
     return {
-        "termo": termo,
-        "titulo": page.title(),
-        "url": page.url
+        "termo":
+            termo,
+
+        "titulo":
+            page.title(),
+
+        "url":
+            page.url
     }
 
+
+# =========================================================
+# COLETAR PRODUTOS
+# =========================================================
 
 def coletar_produtos(page):
 
@@ -212,6 +274,12 @@ def coletar_produtos(page):
             if href in vistos:
                 continue
 
+            if (
+                "/cliente-mateus-mais/"
+                in href
+            ):
+                continue
+
             vistos.add(
                 href
             )
@@ -219,11 +287,13 @@ def coletar_produtos(page):
             texto_link = ""
 
             try:
+
                 texto_link = (
                     link.inner_text(
                         timeout=1500
                     ) or ""
                 ).strip()
+
             except Exception:
                 pass
 
@@ -284,14 +354,23 @@ def coletar_produtos(page):
 
             for linha in linhas:
 
+                linha_lower = (
+                    linha.lower()
+                )
+
                 if (
-                    not linha.startswith("R$")
-                    and "adicionar" not in linha.lower()
-                    and "comprar" not in linha.lower()
+                    not linha.startswith(
+                        "R$"
+                    )
+                    and "adicionar"
+                    not in linha_lower
+                    and "comprar"
+                    not in linha_lower
                     and len(linha) > 3
                 ):
 
                     nome = linha
+
                     break
 
 
@@ -300,29 +379,32 @@ def coletar_produtos(page):
             )
 
 
-            if (
-                "/cliente-mateus-mais/" in href
-            ):
-
-                continue
-
-
             produtos.append(
                 {
-                    "nome": nome,
-                    "preco": preco,
-                    "texto_bruto": contexto[:800],
-                    "href": href
+                    "nome":
+                        nome,
+
+                    "preco":
+                        preco,
+
+                    "texto_bruto":
+                        contexto[:800],
+
+                    "href":
+                        href
                 }
             )
 
         except Exception:
-
             pass
 
 
     return produtos
 
+
+# =========================================================
+# HOME
+# =========================================================
 
 @app.route(
     "/",
@@ -332,19 +414,30 @@ def home():
 
     return jsonify(
         {
-            "status": "online",
-            "servico": "Agente Lista de Compras",
-            "mercado": "Mateus Cohama",
+            "status":
+                "online",
+
+            "servico":
+                "Agente Lista de Compras",
+
+            "mercado":
+                "Mateus Cohama",
+
             "rotas": [
                 "/",
                 "/teste",
                 "/diagnostico",
                 "/buscar?q=arroz",
+                "/capturar-api?q=arroz",
                 "/executar-compra"
             ]
         }
     )
 
+
+# =========================================================
+# TESTE SIMPLES
+# =========================================================
 
 @app.route(
     "/teste",
@@ -373,9 +466,14 @@ def teste():
 
         return jsonify(
             {
-                "status": "ok",
-                "titulo": dados_site["titulo"],
-                "url": dados_site["url"]
+                "status":
+                    "ok",
+
+                "titulo":
+                    dados_site["titulo"],
+
+                "url":
+                    dados_site["url"]
             }
         )
 
@@ -384,12 +482,21 @@ def teste():
 
         return jsonify(
             {
-                "status": "erro",
-                "erro": str(e),
-                "trace": traceback.format_exc()
+                "status":
+                    "erro",
+
+                "erro":
+                    str(e),
+
+                "trace":
+                    traceback.format_exc()
             }
         ), 500
 
+
+# =========================================================
+# DIAGNÓSTICO LEVE
+# =========================================================
 
 @app.route(
     "/diagnostico",
@@ -477,11 +584,20 @@ def diagnostico():
 
         return jsonify(
             {
-                "status": "ok",
-                "titulo": titulo,
-                "url": url,
-                "quantidade_inputs": total,
-                "inputs": candidatos
+                "status":
+                    "ok",
+
+                "titulo":
+                    titulo,
+
+                "url":
+                    url,
+
+                "quantidade_inputs":
+                    total,
+
+                "inputs":
+                    candidatos
             }
         )
 
@@ -490,12 +606,21 @@ def diagnostico():
 
         return jsonify(
             {
-                "status": "erro",
-                "erro": str(e),
-                "trace": traceback.format_exc()
+                "status":
+                    "erro",
+
+                "erro":
+                    str(e),
+
+                "trace":
+                    traceback.format_exc()
             }
         ), 500
 
+
+# =========================================================
+# BUSCA REAL
+# =========================================================
 
 @app.route(
     "/buscar",
@@ -513,7 +638,9 @@ def buscar():
 
         return jsonify(
             {
-                "status": "erro",
+                "status":
+                    "erro",
+
                 "mensagem":
                     "Informe um produto para pesquisar."
             }
@@ -561,8 +688,11 @@ def buscar():
 
         return jsonify(
             {
-                "status": "ok",
-                "resultado": resultado
+                "status":
+                    "ok",
+
+                "resultado":
+                    resultado
             }
         )
 
@@ -571,12 +701,320 @@ def buscar():
 
         return jsonify(
             {
-                "status": "erro",
-                "erro": str(e),
-                "trace": traceback.format_exc()
+                "status":
+                    "erro",
+
+                "erro":
+                    str(e),
+
+                "trace":
+                    traceback.format_exc()
             }
         ), 500
 
+
+# =========================================================
+# CAPTURAR API INTERNA
+# =========================================================
+
+@app.route(
+    "/capturar-api",
+    methods=["GET"]
+)
+def capturar_api():
+
+    termo = request.args.get(
+        "q",
+        "arroz"
+    ).strip()
+
+    try:
+
+        chamadas = []
+
+        respostas = []
+
+
+        with sync_playwright() as p:
+
+            browser = criar_browser(
+                p
+            )
+
+            page = criar_pagina(
+                browser
+            )
+
+
+            # ============================================
+            # REQUESTS
+            # ============================================
+
+            def registrar_request(req):
+
+                try:
+
+                    if req.resource_type in [
+                        "xhr",
+                        "fetch"
+                    ]:
+
+                        chamadas.append(
+                            {
+                                "tipo":
+                                    req.resource_type,
+
+                                "metodo":
+                                    req.method,
+
+                                "url":
+                                    req.url
+                            }
+                        )
+
+                except Exception:
+                    pass
+
+
+            # ============================================
+            # RESPONSES
+            # ============================================
+
+            def registrar_response(resp):
+
+                try:
+
+                    req = resp.request
+
+                    if req.resource_type not in [
+                        "xhr",
+                        "fetch"
+                    ]:
+                        return
+
+
+                    content_type = (
+                        resp.headers.get(
+                            "content-type",
+                            ""
+                        )
+                    )
+
+
+                    registro = {
+
+                        "status":
+                            resp.status,
+
+                        "url":
+                            resp.url,
+
+                        "content_type":
+                            content_type
+
+                    }
+
+
+                    if (
+                        "application/json"
+                        in content_type
+                    ):
+
+                        try:
+
+                            dados = resp.json()
+
+                            texto = str(
+                                dados
+                            )
+
+
+                            registro[
+                                "amostra"
+                            ] = texto[:2000]
+
+
+                        except Exception:
+                            pass
+
+
+                    respostas.append(
+                        registro
+                    )
+
+
+                except Exception:
+                    pass
+
+
+            page.on(
+                "request",
+                registrar_request
+            )
+
+
+            page.on(
+                "response",
+                registrar_response
+            )
+
+
+            # ============================================
+            # ABRIR MATEUS
+            # ============================================
+
+            abrir_mateus(
+                page
+            )
+
+
+            # Ignora chamadas iniciais
+            chamadas.clear()
+            respostas.clear()
+
+
+            # ============================================
+            # BUSCAR
+            # ============================================
+
+            campo = page.locator(
+                "#search-autocomplete-input"
+            )
+
+
+            campo.wait_for(
+                state="visible",
+                timeout=30000
+            )
+
+
+            campo.fill(
+                termo
+            )
+
+
+            page.wait_for_timeout(
+                500
+            )
+
+
+            campo.press(
+                "Enter"
+            )
+
+
+            page.wait_for_timeout(
+                5000
+            )
+
+
+            browser.close()
+
+
+        # ============================================
+        # FILTRAR ENDPOINTS PROVÁVEIS
+        # ============================================
+
+        palavras = [
+
+            "product",
+
+            "produto",
+
+            "search",
+
+            "busca",
+
+            "catalog",
+
+            "catalogo",
+
+            "graphql",
+
+            "sku",
+
+            "offer",
+
+            "price",
+
+            "pricing",
+
+            "market"
+
+        ]
+
+
+        candidatos = []
+
+
+        for resposta in respostas:
+
+            url_lower = (
+                resposta
+                .get(
+                    "url",
+                    ""
+                )
+                .lower()
+            )
+
+
+            if any(
+                palavra in url_lower
+                for palavra in palavras
+            ):
+
+                candidatos.append(
+                    resposta
+                )
+
+
+        return jsonify(
+            {
+                "status":
+                    "ok",
+
+                "termo":
+                    termo,
+
+                "total_chamadas":
+                    len(
+                        chamadas
+                    ),
+
+                "total_respostas":
+                    len(
+                        respostas
+                    ),
+
+                "candidatos":
+                    candidatos[:30],
+
+                "todas_respostas":
+                    respostas[:50]
+            }
+        )
+
+
+    except Exception as e:
+
+        return jsonify(
+            {
+                "status":
+                    "erro",
+
+                "erro":
+                    str(e),
+
+                "trace":
+                    traceback.format_exc()
+            }
+        ), 500
+
+
+# =========================================================
+# PESQUISAR PRODUTO PARA COMPRA
+# =========================================================
 
 def pesquisar_produto(
     page,
@@ -585,6 +1023,7 @@ def pesquisar_produto(
 ):
 
     resultado = {
+
         "item":
             nome,
 
@@ -599,6 +1038,7 @@ def pesquisar_produto(
 
         "preferencias_interpretadas":
             preferencias
+
     }
 
 
@@ -609,9 +1049,11 @@ def pesquisar_produto(
             nome
         )
 
+
         produtos = coletar_produtos(
             page
         )
+
 
         resultado[
             "status"
@@ -632,12 +1074,18 @@ def pesquisar_produto(
             "status"
         ] = "erro"
 
+
         resultado[
             "mensagem"
         ] = str(e)
 
+
         return resultado
 
+
+# =========================================================
+# EXECUTAR COMPRA
+# =========================================================
 
 @app.route(
     "/executar-compra",
@@ -651,16 +1099,20 @@ def executar_compra():
             force=True
         )
 
+
         itens = dados.get(
             "itens",
             []
         )
 
+
         if not itens:
 
             return jsonify(
                 {
-                    "status": "erro",
+                    "status":
+                        "erro",
+
                     "mensagem":
                         "Nenhum item recebido."
                 }
@@ -675,6 +1127,7 @@ def executar_compra():
             browser = criar_browser(
                 p
             )
+
 
             page = criar_pagina(
                 browser
@@ -760,6 +1213,10 @@ def executar_compra():
             }
         ), 500
 
+
+# =========================================================
+# INICIAR APP
+# =========================================================
 
 if __name__ == "__main__":
 
