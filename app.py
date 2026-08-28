@@ -1152,25 +1152,25 @@ def gerar_sessao():
 
 
         page.locator(
-            "#login"
-        ).wait_for(
-            state="visible",
-            timeout=30000
-        )
+    'input#login'
+).wait_for(
+    state="visible",
+    timeout=30000
+)
 
 
-        page.locator(
-            "#login"
-        ).fill(
-            usuario
-        )
+page.locator(
+    'input#login'
+).fill(
+    usuario
+)
 
 
-        page.locator(
-            "#password"
-        ).fill(
-            senha
-        )
+page.locator(
+    'input#password'
+).fill(
+    senha
+)
 
 
         page.locator(
