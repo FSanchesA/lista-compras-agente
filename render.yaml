@@ -3,10 +3,18 @@ services:
     name: lista-compras-agente
     runtime: python
     plan: free
+
     buildCommand: |
+      pip install --upgrade pip
       pip install -r requirements.txt
-      playwright install chromium
+      mkdir -p /opt/render/project/src/.playwright
+      PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/src/.playwright python -m playwright install chromium
+
     startCommand: gunicorn app:app
+
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /opt/render/project/src/.playwright
