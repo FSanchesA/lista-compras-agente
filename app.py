@@ -36,6 +36,11 @@ MATEUS_API = (
     "api/products/internal/v1/service/"
 )
 
+MATEUS_CART_API = (
+    "https://cart-v2.mateusmais.com.br/"
+    "api/v1/cart/"
+)
+
 MARKET_ID = (
     "2857c51e-ffc9-4365-b39a-0156cfc032b9"
 )
@@ -62,7 +67,7 @@ SESSION_MAX_AGE = (
 
 
 # =========================================================
-# NORMALIZAÇÃO DE TEXTO
+# NORMALIZAÇÃO
 # =========================================================
 
 def normalizar_texto(texto):
@@ -482,7 +487,7 @@ def normalizar_produto(produto):
 
 
 # =========================================================
-# BUSCA API
+# BUSCA DIRETA NA API
 # =========================================================
 
 def buscar_produtos_api(
@@ -556,6 +561,9 @@ def buscar_produtos_api(
         "Referer":
             "https://mateusmais.com.br/",
 
+        "Origin":
+            "https://mateusmais.com.br",
+
         "User-Agent":
             (
                 "Mozilla/5.0 "
@@ -614,6 +622,7 @@ def tamanho_compativel(
 ):
 
     if not tamanho:
+
         return True
 
     medida = produto.get(
@@ -719,6 +728,7 @@ def score_compatibilidade(
     ]
 
     if not palavras:
+
         return 0
 
     texto_produto = normalizar_texto(
@@ -756,7 +766,7 @@ def score_compatibilidade(
 
 
 # =========================================================
-# ESCOLHA AUTOMÁTICA
+# ESCOLHA POR PREFERÊNCIA
 # =========================================================
 
 def escolher_por_preferencia(
@@ -915,6 +925,10 @@ def escolher_por_preferencia(
     return None
 
 
+# =========================================================
+# SUGESTÃO MELHOR CUSTO
+# =========================================================
+
 def sugerir_alternativa(
     item,
     produtos
@@ -967,6 +981,10 @@ def sugerir_alternativa(
         0
     ]
 
+
+# =========================================================
+# DECIDIR ITEM
+# =========================================================
 
 def decidir_item(
     nome,
@@ -1128,6 +1146,7 @@ def capturar_session_storage(
                     i < sessionStorage.length;
                     i++
                 ) {
+
                     const chave =
                         sessionStorage.key(i);
 
@@ -1162,7 +1181,7 @@ def capturar_session_storage(
 
 
 # =========================================================
-# LOGIN E SALVAR SESSÃO
+# GERAR SESSÃO
 # =========================================================
 
 def gerar_sessao():
@@ -1309,7 +1328,7 @@ def gerar_sessao():
 
 
 # =========================================================
-# LER STORAGE STATE
+# STORAGE STATE
 # =========================================================
 
 def ler_storage_state():
@@ -1332,7 +1351,7 @@ def ler_storage_state():
 
 
 # =========================================================
-# EXTRAIR VALOR DO LOCAL STORAGE
+# LOCAL STORAGE
 # =========================================================
 
 def obter_local_storage(
@@ -1367,7 +1386,7 @@ def obter_local_storage(
 
 
 # =========================================================
-# EXTRAIR TOKEN DE AUTENTICAÇÃO
+# TOKEN
 # =========================================================
 
 def obter_auth_token():
@@ -1380,7 +1399,6 @@ def obter_auth_token():
 
         return None
 
-    # O valor no Mateus está serializado como JSON.
     try:
 
         parsed = json.loads(
@@ -1428,96 +1446,6 @@ def obter_auth_token():
 
 
 # =========================================================
-# CRIAR SESSÃO HTTP AUTENTICADA
-# =========================================================
-
-def criar_requests_session(
-    incluir_auth=True
-):
-
-    session = requests.Session()
-
-    session.headers.update(
-        {
-            "User-Agent":
-                (
-                    "Mozilla/5.0 "
-                    "(Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) "
-                    "Chrome/151 Safari/537.36"
-                ),
-
-            "Accept":
-                "application/json, text/plain, */*",
-
-            "Origin":
-                "https://mateusmais.com.br",
-
-            "Referer":
-                "https://mateusmais.com.br/"
-        }
-    )
-
-    state = ler_storage_state()
-
-    if state:
-
-        for cookie in state.get(
-            "cookies",
-            []
-        ):
-
-            try:
-
-                session.cookies.set(
-                    cookie.get(
-                        "name"
-                    ),
-
-                    cookie.get(
-                        "value"
-                    ),
-
-                    domain=
-                        cookie.get(
-                            "domain"
-                        ),
-
-                    path=
-                        cookie.get(
-                            "path",
-                            "/"
-                        )
-                )
-
-            except Exception:
-
-                pass
-
-    if incluir_auth:
-
-        token = obter_auth_token()
-
-        if token:
-
-            # Primeira hipótese:
-            # Authorization Bearer.
-            # Não expomos o token em nenhum endpoint.
-            session.headers.update(
-                {
-                    "Authorization":
-                        (
-                            "Bearer " +
-                            token
-                        )
-                }
-            )
-
-    return session
-
-
-# =========================================================
 # GARANTIR SESSÃO
 # =========================================================
 
@@ -1549,7 +1477,66 @@ def garantir_sessao():
 
 
 # =========================================================
-# DIAGNÓSTICO SEGURO DO TOKEN
+# SESSION HTTP AUTENTICADA
+# =========================================================
+
+def criar_requests_session(
+    incluir_auth=True
+):
+
+    session = requests.Session()
+
+    session.headers.update(
+        {
+            "User-Agent":
+                (
+                    "Mozilla/5.0 "
+                    "(Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) "
+                    "Chrome/151 Safari/537.36"
+                ),
+
+            "Accept":
+                "application/json, text/plain, */*",
+
+            "Content-Type":
+                "application/json",
+
+            "Origin":
+                "https://mateusmais.com.br",
+
+            "Referer":
+                "https://mateusmais.com.br/"
+        }
+    )
+
+    if incluir_auth:
+
+        token = obter_auth_token()
+
+        if token:
+
+            # =============================================
+            # PADRÃO REAL IDENTIFICADO NO MATEUS
+            # Authorization: token <TOKEN>
+            # =============================================
+
+            session.headers.update(
+                {
+                    "Authorization":
+                        (
+                            "token " +
+                            token
+                        )
+                }
+            )
+
+    return session
+
+
+# =========================================================
+# DIAGNÓSTICO TOKEN
 # =========================================================
 
 def diagnosticar_token():
@@ -1566,17 +1553,9 @@ def diagnosticar_token():
             "tamanho":
                 0,
 
-            "prefixo":
-                None
+            "valor_exposto":
+                False
         }
-
-    prefixo = None
-
-    if token.startswith(
-        "Bearer "
-    ):
-
-        prefixo = "Bearer"
 
     return {
 
@@ -1588,10 +1567,161 @@ def diagnosticar_token():
                 token
             ),
 
-        "prefixo":
-            prefixo,
+        "authorization":
+            "token <oculto>",
 
         "valor_exposto":
+            False
+    }
+
+
+# =========================================================
+# ADICIONAR PRODUTO AO CARRINHO VIA API
+# =========================================================
+
+def adicionar_produto_carrinho(
+    produto,
+    quantidade=1
+):
+
+    if not produto:
+
+        raise Exception(
+            "Produto não informado."
+        )
+
+    produto_id = produto.get(
+        "id"
+    )
+
+    if not produto_id:
+
+        raise Exception(
+            "Produto sem ID válido."
+        )
+
+    try:
+
+        quantidade = int(
+            quantidade
+        )
+
+    except Exception:
+
+        quantidade = 1
+
+    quantidade = max(
+        1,
+        quantidade
+    )
+
+    token = obter_auth_token()
+
+    if not token:
+
+        raise Exception(
+            "Token de autenticação não encontrado."
+        )
+
+    session = criar_requests_session(
+        incluir_auth=True
+    )
+
+    payload = {
+
+        "products": [
+            {
+                "id":
+                    produto_id,
+
+                "quantity":
+                    quantidade,
+
+                "market_id":
+                    MARKET_ID
+            }
+        ],
+
+        "price_table":
+            "00"
+    }
+
+    inicio = time.time()
+
+    resposta = session.post(
+        MATEUS_CART_API,
+        json=payload,
+        timeout=30
+    )
+
+    tempo = round(
+        time.time() -
+        inicio,
+        2
+    )
+
+    dados_resposta = None
+
+    try:
+
+        dados_resposta = (
+            resposta.json()
+        )
+
+    except Exception:
+
+        pass
+
+    return {
+
+        "sucesso":
+            resposta.status_code
+            in [
+                200,
+                201
+            ],
+
+        "http_status":
+            resposta.status_code,
+
+        "tempo_segundos":
+            tempo,
+
+        "produto":
+            {
+                "id":
+                    produto.get(
+                        "id"
+                    ),
+
+                "sku":
+                    produto.get(
+                        "sku"
+                    ),
+
+                "nome":
+                    produto.get(
+                        "nome"
+                    ),
+
+                "marca":
+                    produto.get(
+                        "marca"
+                    ),
+
+                "preco":
+                    produto.get(
+                        "preco_efetivo"
+                    ),
+
+                "quantidade":
+                    quantidade
+            },
+
+        "resposta":
+            dados_resposta,
+
+        "token_exposto":
             False
     }
 
@@ -1636,7 +1766,7 @@ def home():
 
                 "/teste-auth-http",
 
-                "/teste-endpoints-auth"
+                "/teste-adicionar-carrinho?item=cafe&quantidade=1"
 
             ]
         }
@@ -1644,7 +1774,7 @@ def home():
 
 
 # =========================================================
-# STATUS DA SESSÃO
+# STATUS SESSÃO
 # =========================================================
 
 @app.route(
@@ -1817,7 +1947,7 @@ def diagnostico_token_route():
 
 
 # =========================================================
-# TESTE HTTP COM AUTH
+# TESTE HTTP AUTH
 # =========================================================
 
 @app.route(
@@ -1836,10 +1966,6 @@ def teste_auth_http():
             incluir_auth=True
         )
 
-        token = obter_auth_token()
-
-        # Página pública só serve para validar
-        # que a sessão HTTP está funcional.
         resposta = session.get(
             MATEUS_URL,
             timeout=20,
@@ -1862,20 +1988,14 @@ def teste_auth_http():
 
                 "token_encontrado":
                     bool(
-                        token
+                        obter_auth_token()
                     ),
 
-                "authorization_enviado":
-                    (
-                        "Authorization"
-                        in session.headers
-                    ),
+                "authorization_formato":
+                    "token <oculto>",
 
                 "http_status":
                     resposta.status_code,
-
-                "url_final":
-                    resposta.url,
 
                 "tempo_segundos":
                     tempo,
@@ -1902,18 +2022,71 @@ def teste_auth_http():
 
 
 # =========================================================
-# TESTAR ENDPOINTS AUTENTICADOS POSSÍVEIS
+# TESTE ADICIONAR 1 PRODUTO AO CARRINHO
 # =========================================================
 
 @app.route(
-    "/teste-endpoints-auth",
+    "/teste-adicionar-carrinho",
     methods=["GET"]
 )
-def teste_endpoints_auth():
+def teste_adicionar_carrinho():
 
     try:
 
-        if not sessao_existe():
+        item = request.args.get(
+            "item",
+            "cafe"
+        ).strip()
+
+        preferencias = request.args.get(
+            "preferencias",
+            ""
+        ).strip()
+
+        try:
+
+            quantidade = int(
+                request.args.get(
+                    "quantidade",
+                    "1"
+                )
+            )
+
+        except Exception:
+
+            quantidade = 1
+
+        quantidade = max(
+            quantidade,
+            1
+        )
+
+        # -------------------------------------------------
+        # GARANTIR LOGIN / TOKEN
+        # -------------------------------------------------
+
+        sessao = garantir_sessao()
+
+        # -------------------------------------------------
+        # ESCOLHER PRODUTO
+        # -------------------------------------------------
+
+        decisao = decidir_item(
+            item,
+            preferencias
+        )
+
+        produto = (
+            decisao.get(
+                "escolhido"
+            )
+            or
+            decisao.get(
+                "sugestao"
+            )
+        )
+
+        if not produto:
 
             return jsonify(
                 {
@@ -1922,178 +2095,73 @@ def teste_endpoints_auth():
 
                     "mensagem":
                         (
-                            "Sessão não está válida. "
-                            "Execute /gerar-sessao primeiro."
-                        )
+                            "Nenhum produto compatível "
+                            "foi encontrado."
+                        ),
+
+                    "item":
+                        item,
+
+                    "decisao":
+                        decisao
                 }
-            ), 400
+            ), 404
 
-        inicio = time.time()
+        # -------------------------------------------------
+        # ADICIONAR AO CARRINHO
+        # -------------------------------------------------
 
-        session = criar_requests_session(
-            incluir_auth=True
-        )
-
-        endpoints = [
-
-            (
-                "user",
-                (
-                    MATEUS_APP_API +
-                    "/api/users"
-                )
-            ),
-
-            (
-                "profile",
-                (
-                    MATEUS_APP_API +
-                    "/api/profile"
-                )
-            ),
-
-            (
-                "customer",
-                (
-                    MATEUS_APP_API +
-                    "/api/customer"
-                )
-            ),
-
-            (
-                "customers",
-                (
-                    MATEUS_APP_API +
-                    "/api/customers"
-                )
-            ),
-
-            (
-                "account",
-                (
-                    MATEUS_APP_API +
-                    "/api/account"
-                )
-            ),
-
-            (
-                "me",
-                (
-                    MATEUS_APP_API +
-                    "/api/me"
-                )
-            ),
-
-            (
-                "cart",
-                (
-                    MATEUS_APP_API +
-                    "/api/cart"
-                )
-            ),
-
-            (
-                "carts",
-                (
-                    MATEUS_APP_API +
-                    "/api/carts"
-                )
-            ),
-
-            (
-                "checkout",
-                (
-                    MATEUS_APP_API +
-                    "/api/checkout"
-                )
+        resultado_carrinho = (
+            adicionar_produto_carrinho(
+                produto,
+                quantidade
             )
-        ]
-
-        resultados = []
-
-        for nome, url in endpoints:
-
-            try:
-
-                resposta = session.get(
-                    url,
-                    timeout=8,
-                    allow_redirects=False
-                )
-
-                content_type = (
-                    resposta.headers.get(
-                        "content-type",
-                        ""
-                    )
-                )
-
-                resultados.append(
-                    {
-                        "nome":
-                            nome,
-
-                        "url":
-                            url,
-
-                        "status":
-                            resposta.status_code,
-
-                        "content_type":
-                            content_type,
-
-                        "autenticado_possivel":
-                            resposta.status_code
-                            not in [
-                                401,
-                                403
-                            ],
-
-                        "tamanho_resposta":
-                            len(
-                                resposta.content
-                            )
-                    }
-                )
-
-            except Exception as e:
-
-                resultados.append(
-                    {
-                        "nome":
-                            nome,
-
-                        "url":
-                            url,
-
-                        "status":
-                            "ERRO",
-
-                        "erro":
-                            str(e)
-                    }
-                )
-
-        tempo = round(
-            time.time() -
-            inicio,
-            2
         )
 
         return jsonify(
             {
                 "status":
-                    "ok",
+                    (
+                        "ok"
+                        if resultado_carrinho[
+                            "sucesso"
+                        ]
+                        else "erro"
+                    ),
 
-                "token":
-                    diagnosticar_token(),
+                "sessao":
+                    sessao,
 
-                "tempo_segundos":
-                    tempo,
+                "item_solicitado":
+                    item,
 
-                "resultados":
-                    resultados
+                "decisao":
+                    {
+                        "status":
+                            decisao.get(
+                                "status"
+                            ),
+
+                        "motivo":
+                            decisao.get(
+                                "motivo"
+                            ),
+
+                        "preferencia_atendida":
+                            decisao.get(
+                                "preferencia_atendida"
+                            )
+                    },
+
+                "carrinho":
+                    resultado_carrinho
             }
+        ), (
+            200
+            if resultado_carrinho[
+                "sucesso"
+            ]
+            else 400
         )
 
     except Exception as e:
@@ -2158,7 +2226,7 @@ def api_buscar():
 
 
 # =========================================================
-# EXECUTAR COMPRA - ANÁLISE
+# EXECUTAR COMPRA - SOMENTE ANÁLISE POR ENQUANTO
 # =========================================================
 
 @app.route(
