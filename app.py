@@ -158,7 +158,6 @@ def parse_preferencias(texto):
 
                 limite = None
 
-
             descricao = re.sub(
                 r"\s*at[eé]\s+R?\$?\s*[\d,.]+",
                 "",
@@ -169,7 +168,6 @@ def parse_preferencias(texto):
         else:
 
             descricao = parte.strip()
-
 
         preferencias.append(
             {
@@ -389,7 +387,6 @@ def normalizar_produto(produto):
     except Exception:
 
         preco_por_medida = None
-
 
     return {
 
@@ -647,7 +644,6 @@ def tamanho_compativel(
 
         return False
 
-
     valor = float(
         tamanho[
             "valor"
@@ -658,14 +654,12 @@ def tamanho_compativel(
         "tipo"
     ]
 
-
     if tipo == tipo_pref:
 
         return abs(
             medida -
             valor
         ) < 0.01
-
 
     if (
         tipo == "G"
@@ -677,7 +671,6 @@ def tamanho_compativel(
             valor * 1000
         ) < 1
 
-
     if (
         tipo == "KG"
         and tipo_pref == "G"
@@ -687,7 +680,6 @@ def tamanho_compativel(
             medida * 1000 -
             valor
         ) < 1
-
 
     if (
         tipo == "ML"
@@ -699,7 +691,6 @@ def tamanho_compativel(
             valor * 1000
         ) < 1
 
-
     if (
         tipo == "L"
         and tipo_pref == "ML"
@@ -709,7 +700,6 @@ def tamanho_compativel(
             medida * 1000 -
             valor
         ) < 1
-
 
     return False
 
@@ -734,7 +724,6 @@ def score_compatibilidade(
     if not palavras:
         return 0
 
-
     texto_produto = normalizar_texto(
         (
             str(
@@ -755,13 +744,11 @@ def score_compatibilidade(
         )
     )
 
-
     acertos = sum(
         1
         for palavra in palavras
         if palavra in texto_produto
     )
-
 
     return (
         acertos /
@@ -802,7 +789,6 @@ def escolher_por_preferencia(
 
         candidatos = []
 
-
         for produto in produtos:
 
             if not produto.get(
@@ -812,11 +798,9 @@ def escolher_por_preferencia(
 
                 continue
 
-
             estoque = produto.get(
                 "estoque"
             )
-
 
             if (
                 estoque is not None
@@ -825,7 +809,6 @@ def escolher_por_preferencia(
 
                 continue
 
-
             if not tamanho_compativel(
                 produto,
                 tamanho
@@ -833,16 +816,13 @@ def escolher_por_preferencia(
 
                 continue
 
-
             preco = produto.get(
                 "preco_efetivo"
             )
 
-
             if preco is None:
 
                 continue
-
 
             if (
                 limite is not None
@@ -851,17 +831,14 @@ def escolher_por_preferencia(
 
                 continue
 
-
             score = score_compatibilidade(
                 produto,
                 descricao
             )
 
-
             if score <= 0:
 
                 continue
-
 
             candidatos.append(
                 {
@@ -873,7 +850,6 @@ def escolher_por_preferencia(
                 }
             )
 
-
         if candidatos:
 
             melhor_score = max(
@@ -882,7 +858,6 @@ def escolher_por_preferencia(
                 ]
                 for x in candidatos
             )
-
 
             melhores = [
                 x
@@ -895,7 +870,6 @@ def escolher_por_preferencia(
                 ) < 0.0001
             ]
 
-
             melhores.sort(
                 key=lambda x:
                     x[
@@ -906,7 +880,6 @@ def escolher_por_preferencia(
                     or 999999
             )
 
-
             escolhido = (
                 melhores[
                     0
@@ -914,7 +887,6 @@ def escolher_por_preferencia(
                     "produto"
                 ]
             )
-
 
             return {
 
@@ -942,7 +914,6 @@ def escolher_por_preferencia(
                         f"{prioridade} atendida."
                     )
             }
-
 
     return None
 
@@ -974,11 +945,9 @@ def sugerir_alternativa(
         )
     ]
 
-
     if not disponiveis:
 
         return None
-
 
     disponiveis.sort(
         key=lambda p: (
@@ -996,7 +965,6 @@ def sugerir_alternativa(
             or 999999
         )
     )
-
 
     return disponiveis[
         0
@@ -1022,7 +990,6 @@ def decidir_item(
         []
     )
 
-
     if preferencias:
 
         escolha = escolher_por_preferencia(
@@ -1035,12 +1002,10 @@ def decidir_item(
 
             return escolha
 
-
     sugestao = sugerir_alternativa(
         nome,
         produtos
     )
-
 
     return {
 
@@ -1091,13 +1056,11 @@ def sessao_existe():
 
         return False
 
-
     if not os.path.exists(
         SESSION_META_FILE
     ):
 
         return False
-
 
     try:
 
@@ -1111,24 +1074,20 @@ def sessao_existe():
                 arquivo
             )
 
-
         criado = meta.get(
             "timestamp",
             0
         )
-
 
         idade = (
             time.time() -
             criado
         )
 
-
         return (
             idade <
             SESSION_MAX_AGE
         )
-
 
     except Exception:
 
@@ -1184,7 +1143,6 @@ def capturar_session_storage(
             """
         )
 
-
         with open(
             SESSION_STORAGE_FILE,
             "w",
@@ -1197,11 +1155,9 @@ def capturar_session_storage(
                 ensure_ascii=False
             )
 
-
         return len(
             dados
         )
-
 
     except Exception:
 
@@ -1222,7 +1178,6 @@ def gerar_sessao():
         "MATEUS_SENHA"
     )
 
-
     if not usuario or not senha:
 
         raise Exception(
@@ -1230,13 +1185,11 @@ def gerar_sessao():
             "não configuradas no Render."
         )
 
-
     with sync_playwright() as p:
 
         browser = criar_browser(
             p
         )
-
 
         context = browser.new_context(
             viewport={
@@ -1249,9 +1202,7 @@ def gerar_sessao():
             locale="pt-BR"
         )
 
-
         page = context.new_page()
-
 
         page.goto(
             "https://mateusmais.com.br/login",
@@ -1259,52 +1210,42 @@ def gerar_sessao():
             timeout=60000
         )
 
-
         campo_login = page.locator(
             'input#login'
         )
-
 
         campo_login.wait_for(
             state="visible",
             timeout=30000
         )
 
-
         campo_login.fill(
             usuario
         )
 
-
         campo_senha = page.locator(
             'input#password'
         )
-
 
         campo_senha.wait_for(
             state="visible",
             timeout=30000
         )
 
-
         campo_senha.fill(
             senha
         )
 
-
         botao_entrar = page.locator(
             'button[type="submit"]'
         )
-
 
         botao_entrar.wait_for(
             state="visible",
             timeout=30000
         )
 
-
         botao_entrar.click()
-
 
         try:
 
@@ -1319,32 +1260,25 @@ def gerar_sessao():
 
             pass
 
-
         page.wait_for_timeout(
             2500
         )
 
-
         url_final = page.url
-
 
         if "/login" in url_final:
 
             browser.close()
 
             raise Exception(
-                "Login não foi concluído. "
-                "O Mateus permaneceu na página de login."
+                "Login não foi concluído."
             )
-
 
         context.storage_state(
             path=SESSION_FILE
         )
 
-
         cookies = context.cookies()
-
 
         session_storage_qtd = (
             capturar_session_storage(
@@ -1352,12 +1286,9 @@ def gerar_sessao():
             )
         )
 
-
         salvar_meta_sessao()
 
-
         browser.close()
-
 
     return {
 
@@ -1397,9 +1328,7 @@ def garantir_sessao():
                 False
         }
 
-
     resultado = gerar_sessao()
-
 
     return {
 
@@ -1423,7 +1352,6 @@ def criar_requests_session():
 
         gerar_sessao()
 
-
     with open(
         SESSION_FILE,
         "r",
@@ -1434,9 +1362,7 @@ def criar_requests_session():
             arquivo
         )
 
-
     session = requests.Session()
-
 
     session.headers.update(
         {
@@ -1456,7 +1382,6 @@ def criar_requests_session():
                 "https://mateusmais.com.br/"
         }
     )
-
 
     for cookie in state.get(
         "cookies",
@@ -1490,12 +1415,11 @@ def criar_requests_session():
 
             pass
 
-
     return session
 
 
 # =========================================================
-# DETECTAR CHAVE SUSPEITA DE AUTENTICAÇÃO
+# IDENTIFICAR CHAVES DE AUTENTICAÇÃO
 # =========================================================
 
 def parece_chave_auth(
@@ -1505,7 +1429,6 @@ def parece_chave_auth(
     nome = normalizar_texto(
         nome
     )
-
 
     palavras = [
 
@@ -1537,16 +1460,11 @@ def parece_chave_auth(
 
     ]
 
-
     return any(
         palavra in nome
         for palavra in palavras
     )
 
-
-# =========================================================
-# DESCREVER VALOR SEM EXPOR CONTEÚDO
-# =========================================================
 
 def descrever_valor_seguro(
     valor
@@ -1569,14 +1487,11 @@ def descrever_valor_seguro(
                 False
         }
 
-
     texto = str(
         valor
     )
 
-
     parece_json = False
-
 
     try:
 
@@ -1590,11 +1505,9 @@ def descrever_valor_seguro(
 
         pass
 
-
     partes_jwt = texto.split(
         "."
     )
-
 
     parece_jwt = (
         len(
@@ -1607,7 +1520,6 @@ def descrever_valor_seguro(
             for parte in partes_jwt
         )
     )
-
 
     return {
 
@@ -1624,6 +1536,95 @@ def descrever_valor_seguro(
 
         "parece_jwt":
             parece_jwt
+    }
+
+
+# =========================================================
+# SANITIZAR HEADERS
+# =========================================================
+
+def analisar_headers_auth(
+    headers
+):
+
+    headers_lower = {
+        str(
+            chave
+        ).lower():
+            valor
+        for chave, valor
+        in headers.items()
+    }
+
+    authorization = headers_lower.get(
+        "authorization"
+    )
+
+    authorization_presente = bool(
+        authorization
+    )
+
+    authorization_tipo = None
+
+    if authorization_presente:
+
+        texto = str(
+            authorization
+        ).strip()
+
+        if " " in texto:
+
+            authorization_tipo = (
+                texto.split(
+                    " ",
+                    1
+                )[0]
+            )
+
+        else:
+
+            authorization_tipo = (
+                "TOKEN_SEM_PREFIXO"
+            )
+
+    headers_interessantes = []
+
+    for nome in headers_lower.keys():
+
+        if any(
+            palavra in nome
+            for palavra in [
+                "authorization",
+                "auth",
+                "token",
+                "api-key",
+                "apikey",
+                "x-api",
+                "client",
+                "session"
+            ]
+        ):
+
+            headers_interessantes.append(
+                nome
+            )
+
+    return {
+
+        "authorization_presente":
+            authorization_presente,
+
+        "authorization_tipo":
+            authorization_tipo,
+
+        "headers_auth_detectados":
+            sorted(
+                list(
+                    set(
+                        headers_interessantes
+                    )
+                )
+            )
     }
 
 
@@ -1667,7 +1668,9 @@ def home():
 
                 "/diagnostico-storage",
 
-                "/diagnostico-auth"
+                "/diagnostico-auth",
+
+                "/diagnostico-requisicoes-auth"
 
             ]
         }
@@ -1688,7 +1691,6 @@ def status_sessao():
 
     idade = None
 
-
     if (
         existe
         and os.path.exists(
@@ -1708,7 +1710,6 @@ def status_sessao():
                     arquivo
                 )
 
-
             idade = round(
                 time.time() -
                 meta.get(
@@ -1721,7 +1722,6 @@ def status_sessao():
         except Exception:
 
             pass
-
 
     return jsonify(
         {
@@ -1764,9 +1764,7 @@ def gerar_sessao_route():
 
         inicio = time.time()
 
-
         resultado = gerar_sessao()
-
 
         tempo = round(
             time.time() -
@@ -1774,11 +1772,9 @@ def gerar_sessao_route():
             2
         )
 
-
         resultado[
             "tempo_segundos"
         ] = tempo
-
 
         return jsonify(
             {
@@ -1789,7 +1785,6 @@ def gerar_sessao_route():
                     resultado
             }
         )
-
 
     except Exception as e:
 
@@ -1808,7 +1803,7 @@ def gerar_sessao_route():
 
 
 # =========================================================
-# DIAGNÓSTICO STORAGE STATE
+# DIAGNÓSTICO STORAGE
 # =========================================================
 
 @app.route(
@@ -1829,11 +1824,12 @@ def diagnostico_storage():
                         "erro",
 
                     "mensagem":
-                        "Storage state ainda não existe. "
-                        "Execute /gerar-sessao primeiro."
+                        (
+                            "Storage state ainda não existe. "
+                            "Execute /gerar-sessao primeiro."
+                        )
                 }
             ), 400
-
 
         with open(
             SESSION_FILE,
@@ -1845,9 +1841,7 @@ def diagnostico_storage():
                 arquivo
             )
 
-
         cookies_saida = []
-
 
         for cookie in state.get(
             "cookies",
@@ -1858,7 +1852,6 @@ def diagnostico_storage():
                 "name",
                 ""
             )
-
 
             cookies_saida.append(
                 {
@@ -1892,9 +1885,7 @@ def diagnostico_storage():
                 }
             )
 
-
         origins_saida = []
-
 
         for origin in state.get(
             "origins",
@@ -1902,7 +1893,6 @@ def diagnostico_storage():
         ):
 
             storage_saida = []
-
 
             for entrada in origin.get(
                 "localStorage",
@@ -1918,11 +1908,9 @@ def diagnostico_storage():
                     "value"
                 )
 
-
                 info = descrever_valor_seguro(
                     valor
                 )
-
 
                 storage_saida.append(
                     {
@@ -1951,7 +1939,6 @@ def diagnostico_storage():
                     }
                 )
 
-
             origins_saida.append(
                 {
                     "origin":
@@ -1964,9 +1951,7 @@ def diagnostico_storage():
                 }
             )
 
-
         session_storage_saida = []
-
 
         if os.path.exists(
             SESSION_STORAGE_FILE
@@ -1984,13 +1969,11 @@ def diagnostico_storage():
                         arquivo
                     )
 
-
                 for nome, valor in ss.items():
 
                     info = descrever_valor_seguro(
                         valor
                     )
-
 
                     session_storage_saida.append(
                         {
@@ -2023,7 +2006,6 @@ def diagnostico_storage():
 
                 pass
 
-
         return jsonify(
             {
                 "status":
@@ -2051,7 +2033,6 @@ def diagnostico_storage():
             }
         )
 
-
     except Exception as e:
 
         return jsonify(
@@ -2069,7 +2050,7 @@ def diagnostico_storage():
 
 
 # =========================================================
-# DIAGNÓSTICO DE AUTENTICAÇÃO
+# DIAGNÓSTICO AUTH
 # =========================================================
 
 @app.route(
@@ -2092,9 +2073,7 @@ def diagnostico_auth():
                 }
             ), 400
 
-
         candidatos = []
-
 
         with open(
             SESSION_FILE,
@@ -2106,7 +2085,6 @@ def diagnostico_auth():
                 arquivo
             )
 
-
         for cookie in state.get(
             "cookies",
             []
@@ -2116,7 +2094,6 @@ def diagnostico_auth():
                 "name",
                 ""
             )
-
 
             if parece_chave_auth(
                 nome
@@ -2137,7 +2114,6 @@ def diagnostico_auth():
                     }
                 )
 
-
         for origin in state.get(
             "origins",
             []
@@ -2157,11 +2133,9 @@ def diagnostico_auth():
                     "value"
                 )
 
-
                 info = descrever_valor_seguro(
                     valor
                 )
-
 
                 if (
                     parece_chave_auth(
@@ -2197,7 +2171,6 @@ def diagnostico_auth():
                         }
                     )
 
-
         if os.path.exists(
             SESSION_STORAGE_FILE
         ):
@@ -2214,13 +2187,11 @@ def diagnostico_auth():
                         arquivo
                     )
 
-
                 for nome, valor in ss.items():
 
                     info = descrever_valor_seguro(
                         valor
                     )
-
 
                     if (
                         parece_chave_auth(
@@ -2255,7 +2226,6 @@ def diagnostico_auth():
 
                 pass
 
-
         return jsonify(
             {
                 "status":
@@ -2274,6 +2244,307 @@ def diagnostico_auth():
             }
         )
 
+    except Exception as e:
+
+        return jsonify(
+            {
+                "status":
+                    "erro",
+
+                "erro":
+                    str(e),
+
+                "trace":
+                    traceback.format_exc()
+            }
+        ), 500
+
+
+# =========================================================
+# DIAGNÓSTICO DE REQUISIÇÕES AUTENTICADAS
+# =========================================================
+
+@app.route(
+    "/diagnostico-requisicoes-auth",
+    methods=["GET"]
+)
+def diagnostico_requisicoes_auth():
+
+    try:
+
+        if not sessao_existe():
+
+            return jsonify(
+                {
+                    "status":
+                        "erro",
+
+                    "mensagem":
+                        (
+                            "Sessão não está válida. "
+                            "Execute /gerar-sessao primeiro."
+                        )
+                }
+            ), 400
+
+        capturas = []
+
+        with sync_playwright() as p:
+
+            browser = criar_browser(
+                p
+            )
+
+            context = browser.new_context(
+                storage_state=
+                    SESSION_FILE,
+
+                viewport={
+                    "width":
+                        1440,
+
+                    "height":
+                        900
+                },
+
+                locale=
+                    "pt-BR"
+            )
+
+            page = context.new_page()
+
+            def registrar_request(req):
+
+                try:
+
+                    if req.resource_type not in [
+                        "xhr",
+                        "fetch"
+                    ]:
+
+                        return
+
+                    try:
+
+                        headers = req.all_headers()
+
+                    except Exception:
+
+                        headers = req.headers
+
+                    analise = analisar_headers_auth(
+                        headers
+                    )
+
+                    url_lower = req.url.lower()
+
+                    endpoint_interessante = any(
+                        palavra in url_lower
+                        for palavra in [
+                            "user",
+                            "customer",
+                            "cliente",
+                            "profile",
+                            "account",
+                            "auth",
+                            "cart",
+                            "basket",
+                            "order",
+                            "checkout",
+                            "shipping",
+                            "address"
+                        ]
+                    )
+
+                    if (
+                        analise[
+                            "authorization_presente"
+                        ]
+                        or analise[
+                            "headers_auth_detectados"
+                        ]
+                        or endpoint_interessante
+                    ):
+
+                        capturas.append(
+                            {
+                                "metodo":
+                                    req.method,
+
+                                "url":
+                                    req.url,
+
+                                "resource_type":
+                                    req.resource_type,
+
+                                "authorization_presente":
+                                    analise[
+                                        "authorization_presente"
+                                    ],
+
+                                "authorization_tipo":
+                                    analise[
+                                        "authorization_tipo"
+                                    ],
+
+                                "headers_auth_detectados":
+                                    analise[
+                                        "headers_auth_detectados"
+                                    ]
+                            }
+                        )
+
+                except Exception:
+
+                    pass
+
+            page.on(
+                "request",
+                registrar_request
+            )
+
+            page.goto(
+                MATEUS_URL,
+                wait_until="domcontentloaded",
+                timeout=60000
+            )
+
+            page.wait_for_timeout(
+                5000
+            )
+
+            # Tenta abrir uma área tipicamente autenticada
+            seletores_conta = [
+
+                'a[href*="conta"]',
+
+                'a[href*="perfil"]',
+
+                'a[href*="pedido"]',
+
+                'button:has-text("Minha conta")',
+
+                'a:has-text("Minha conta")',
+
+                'button:has-text("Meus pedidos")',
+
+                'a:has-text("Meus pedidos")'
+
+            ]
+
+            clicou_area_conta = False
+
+            for seletor in seletores_conta:
+
+                try:
+
+                    elemento = page.locator(
+                        seletor
+                    ).first
+
+                    if elemento.is_visible(
+                        timeout=700
+                    ):
+
+                        elemento.click()
+
+                        clicou_area_conta = True
+
+                        page.wait_for_timeout(
+                            3000
+                        )
+
+                        break
+
+                except Exception:
+
+                    pass
+
+            url_final = page.url
+
+            browser.close()
+
+        # Remove duplicatas
+        unicas = []
+
+        vistos = set()
+
+        for captura in capturas:
+
+            chave = (
+                captura.get(
+                    "metodo"
+                ),
+                captura.get(
+                    "url"
+                ),
+                captura.get(
+                    "authorization_presente"
+                ),
+                captura.get(
+                    "authorization_tipo"
+                )
+            )
+
+            if chave in vistos:
+
+                continue
+
+            vistos.add(
+                chave
+            )
+
+            unicas.append(
+                captura
+            )
+
+        com_authorization = [
+            x
+            for x in unicas
+            if x.get(
+                "authorization_presente"
+            )
+        ]
+
+        return jsonify(
+            {
+                "status":
+                    "ok",
+
+                "sessao_utilizada":
+                    True,
+
+                "clicou_area_conta":
+                    clicou_area_conta,
+
+                "url_final":
+                    url_final,
+
+                "quantidade_requisicoes":
+                    len(
+                        unicas
+                    ),
+
+                "quantidade_com_authorization":
+                    len(
+                        com_authorization
+                    ),
+
+                "autenticacao_detectada":
+                    len(
+                        com_authorization
+                    ) > 0,
+
+                "requisicoes":
+                    unicas[:50],
+
+                "seguranca":
+                    (
+                        "Nenhum token ou valor de "
+                        "autenticação foi exposto."
+                    )
+            }
+        )
 
     except Exception as e:
 
@@ -2305,12 +2576,9 @@ def teste_sessao_http():
 
         inicio = time.time()
 
-
         garantia = garantir_sessao()
 
-
         session = criar_requests_session()
-
 
         resposta = session.get(
             MATEUS_URL,
@@ -2318,13 +2586,11 @@ def teste_sessao_http():
             allow_redirects=True
         )
 
-
         tempo = round(
             time.time() -
             inicio,
             2
         )
-
 
         return jsonify(
             {
@@ -2349,7 +2615,6 @@ def teste_sessao_http():
                     )
             }
         )
-
 
     except Exception as e:
 
@@ -2382,14 +2647,12 @@ def api_buscar():
         "arroz"
     ).strip()
 
-
     try:
 
         resultado = buscar_produtos_api(
             termo,
             limite=50
         )
-
 
         return jsonify(
             {
@@ -2400,7 +2663,6 @@ def api_buscar():
                     resultado
             }
         )
-
 
     except Exception as e:
 
@@ -2431,12 +2693,10 @@ def executar_compra():
             force=True
         )
 
-
         itens = dados.get(
             "itens",
             []
         )
-
 
         if not itens:
 
@@ -2450,9 +2710,7 @@ def executar_compra():
                 }
             ), 400
 
-
         resultados = []
-
 
         for item in itens:
 
@@ -2463,18 +2721,15 @@ def executar_compra():
                 ).strip()
             )
 
-
             preferencias = item.get(
                 "preferencias",
                 ""
             )
 
-
             quantidade = item.get(
                 "quantidade",
                 "1"
             )
-
 
             try:
 
@@ -2483,16 +2738,13 @@ def executar_compra():
                     preferencias
                 )
 
-
                 resultado[
                     "quantidade"
                 ] = quantidade
 
-
                 resultados.append(
                     resultado
                 )
-
 
             except Exception as e:
 
@@ -2512,7 +2764,6 @@ def executar_compra():
                     }
                 )
 
-
         return jsonify(
             {
                 "status":
@@ -2530,7 +2781,6 @@ def executar_compra():
                     resultados
             }
         )
-
 
     except Exception as e:
 
@@ -2560,7 +2810,6 @@ if __name__ == "__main__":
             5000
         )
     )
-
 
     app.run(
         host="0.0.0.0",
