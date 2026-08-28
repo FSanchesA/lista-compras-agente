@@ -79,7 +79,7 @@ def parse_preferencias(texto):
 
 def extrair_preco(texto):
     """
-    Converte textos como:
+    Converte:
     R$ 12,99
 
     Para:
@@ -112,11 +112,10 @@ def extrair_preco(texto):
 
 def criar_browser(playwright):
     """
-    Cria o navegador Chromium usando
-    configurações adequadas ao Render.
+    Chromium configurado para o Render.
     """
 
-    browser = playwright.chromium.launch(
+    return playwright.chromium.launch(
         headless=True,
         args=[
             "--no-sandbox",
@@ -126,15 +125,13 @@ def criar_browser(playwright):
         ]
     )
 
-    return browser
-
 
 def criar_pagina(browser):
     """
-    Cria uma página com tamanho de desktop.
+    Cria uma página desktop.
     """
 
-    page = browser.new_page(
+    return browser.new_page(
         viewport={
             "width": 1440,
             "height": 900
@@ -142,13 +139,10 @@ def criar_pagina(browser):
         locale="pt-BR"
     )
 
-    return page
-
 
 def abrir_mateus(page):
     """
-    Abre diretamente a loja
-    Supermercado Mateus Cohama.
+    Abre a loja Mateus Cohama.
     """
 
     page.goto(
@@ -158,7 +152,7 @@ def abrir_mateus(page):
     )
 
     page.wait_for_timeout(
-        4000
+        3500
     )
 
     return {
@@ -169,17 +163,8 @@ def abrir_mateus(page):
 
 def login_mateus(page):
     """
-    Estrutura inicial do login.
-
-    As credenciais serão configuradas
-    no Render usando variáveis de ambiente:
-
-    MATEUS_LOGIN
-    MATEUS_SENHA
-
-    Ainda não tentamos fazer login porque
-    primeiro estamos identificando os
-    elementos reais do site.
+    Login será implementado depois que
+    identificarmos os elementos reais do site.
     """
 
     usuario = os.getenv(
@@ -191,7 +176,6 @@ def login_mateus(page):
     )
 
     if not usuario or not senha:
-
         raise Exception(
             "Credenciais do Mateus não configuradas."
         )
@@ -211,28 +195,19 @@ def pesquisar_produto(
     preferencias
 ):
     """
-    Primeira estrutura da busca.
-
-    Ainda não clica em produtos.
-    Primeiro estamos identificando
-    corretamente a estrutura do Mateus Mais.
+    Estrutura da busca.
+    A pesquisa real será adicionada depois
+    do diagnóstico do campo de pesquisa.
     """
 
     resultado = {
-
         "item": nome,
-
         "status": "pendente",
-
         "produto_encontrado": None,
-
         "preco": None,
-
         "mensagem": "",
-
         "preferencias_interpretadas":
             preferencias
-
     }
 
     try:
@@ -273,7 +248,6 @@ def home():
 
     return jsonify(
         {
-
             "status":
                 "online",
 
@@ -289,7 +263,6 @@ def home():
                 "/diagnostico",
                 "/executar-compra"
             ]
-
         }
     )
 
@@ -320,7 +293,6 @@ def teste():
 
         return jsonify(
             {
-
                 "status":
                     "ok",
 
@@ -329,7 +301,6 @@ def teste():
 
                 "url":
                     dados_site["url"]
-
             }
         )
 
@@ -337,7 +308,6 @@ def teste():
 
         return jsonify(
             {
-
                 "status":
                     "erro",
 
@@ -346,7 +316,6 @@ def teste():
 
                 "trace":
                     traceback.format_exc()
-
             }
         ), 500
 
@@ -357,16 +326,11 @@ def teste():
 )
 def diagnostico():
     """
-    Esta rota serve para descobrir
-    como o site Mateus Mais está estruturado.
+    Diagnóstico leve.
 
-    Ela lista:
-    - inputs
-    - buttons
-    - links
-
-    Assim identificamos o campo de busca,
-    botão de login, carrinho etc.
+    Analisa somente os primeiros inputs
+    da página para identificar o campo
+    de pesquisa sem sobrecarregar o Render.
     """
 
     try:
@@ -386,106 +350,81 @@ def diagnostico():
             )
 
             page.wait_for_timeout(
-                3000
+                2000
             )
 
-            inputs = (
-                page
-                .locator(
-                    "input"
+            candidatos = []
+
+            inputs = page.locator(
+                "input"
+            )
+
+            total = inputs.count()
+
+            limite = min(
+                total,
+                20
+            )
+
+            for i in range(
+                limite
+            ):
+
+                el = inputs.nth(
+                    i
                 )
-                .evaluate_all(
-                    """
-                    elements => elements.map(
-                        (el, i) => ({
-                            indice: i,
-                            type: el.type || "",
-                            name: el.name || "",
-                            id: el.id || "",
-                            placeholder: el.placeholder || "",
-                            ariaLabel:
-                                el.getAttribute('aria-label') || "",
-                            autocomplete:
-                                el.getAttribute('autocomplete') || "",
-                            className:
-                                typeof el.className === 'string'
-                                ? el.className
-                                : ""
-                        })
+
+                try:
+
+                    candidatos.append(
+                        {
+                            "indice":
+                                i,
+
+                            "placeholder":
+                                el.get_attribute(
+                                    "placeholder"
+                                ) or "",
+
+                            "name":
+                                el.get_attribute(
+                                    "name"
+                                ) or "",
+
+                            "type":
+                                el.get_attribute(
+                                    "type"
+                                ) or "",
+
+                            "id":
+                                el.get_attribute(
+                                    "id"
+                                ) or "",
+
+                            "aria_label":
+                                el.get_attribute(
+                                    "aria-label"
+                                ) or "",
+
+                            "autocomplete":
+                                el.get_attribute(
+                                    "autocomplete"
+                                ) or ""
+                        }
                     )
-                    """
-                )
-            )
 
-            buttons = (
-                page
-                .locator(
-                    "button"
-                )
-                .evaluate_all(
-                    """
-                    elements => elements
-                    .slice(0, 100)
-                    .map(
-                        (el, i) => ({
-                            indice: i,
-                            texto:
-                                (el.innerText || "").trim(),
-                            ariaLabel:
-                                el.getAttribute('aria-label') || "",
-                            title:
-                                el.getAttribute('title') || "",
-                            type:
-                                el.getAttribute('type') || "",
-                            className:
-                                typeof el.className === 'string'
-                                ? el.className
-                                : ""
-                        })
-                    )
-                    """
-                )
-            )
+                except Exception:
 
-            links = (
-                page
-                .locator(
-                    "a"
-                )
-                .evaluate_all(
-                    """
-                    elements => elements
-                    .slice(0, 150)
-                    .map(
-                        (el, i) => ({
-                            indice: i,
-                            texto:
-                                (el.innerText || "").trim(),
-                            href:
-                                el.href || "",
-                            ariaLabel:
-                                el.getAttribute('aria-label') || "",
-                            title:
-                                el.getAttribute('title') || ""
-                        })
-                    )
-                    """
-                )
-            )
+                    pass
 
-            titulo = (
-                page.title()
-            )
+            titulo = page.title()
 
-            url = (
-                page.url
-            )
+            url = page.url
 
             browser.close()
 
         return jsonify(
             {
-
                 "status":
                     "ok",
 
@@ -496,23 +435,10 @@ def diagnostico():
                     url,
 
                 "quantidade_inputs":
-                    len(inputs),
-
-                "quantidade_buttons":
-                    len(buttons),
-
-                "quantidade_links":
-                    len(links),
+                    total,
 
                 "inputs":
-                    inputs,
-
-                "buttons":
-                    buttons,
-
-                "links":
-                    links
-
+                    candidatos
             }
         )
 
@@ -520,7 +446,6 @@ def diagnostico():
 
         return jsonify(
             {
-
                 "status":
                     "erro",
 
@@ -529,7 +454,6 @@ def diagnostico():
 
                 "trace":
                     traceback.format_exc()
-
             }
         ), 500
 
@@ -555,13 +479,11 @@ def executar_compra():
 
             return jsonify(
                 {
-
                     "status":
                         "erro",
 
                     "mensagem":
                         "Nenhum item recebido."
-
                 }
             ), 400
 
@@ -637,7 +559,6 @@ def executar_compra():
 
         return jsonify(
             {
-
                 "status":
                     "ok",
 
@@ -651,7 +572,6 @@ def executar_compra():
 
                 "resultados":
                     resultados
-
             }
         )
 
@@ -660,7 +580,6 @@ def executar_compra():
 
         return jsonify(
             {
-
                 "status":
                     "erro",
 
@@ -669,7 +588,6 @@ def executar_compra():
 
                 "trace":
                     traceback.format_exc()
-
             }
         ), 500
 
