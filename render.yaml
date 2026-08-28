@@ -10,7 +10,7 @@ services:
       mkdir -p /opt/render/project/src/.playwright
       PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/src/.playwright python -m playwright install chromium
 
-    startCommand: gunicorn app:app
+    startCommand: gunicorn app:app --workers 1 --threads 2 --timeout 180
 
     envVars:
       - key: PYTHON_VERSION
