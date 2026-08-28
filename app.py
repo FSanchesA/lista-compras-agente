@@ -5,7 +5,6 @@ import os
 import re
 import json
 import time
-import math
 import statistics
 import traceback
 import requests
@@ -19,11 +18,6 @@ app = Flask(__name__)
 # =========================================================
 # CONFIGURAÇÕES
 # =========================================================
-
-MATEUS_URL = (
-    "https://mateusmais.com.br/"
-    "loja/supermercado-mateus-cohama"
-)
 
 MATEUS_API = (
     "https://app.mateusmais.com.br/"
@@ -732,6 +726,7 @@ def produto_disponivel(
     if produto.get(
         "for_sale"
     ) is False:
+
         return False
 
     estoque = produto.get(
@@ -742,16 +737,19 @@ def produto_disponivel(
         estoque is not None
         and estoque <= 0
     ):
+
         return False
 
     if produto.get(
         "preco_efetivo"
     ) is None:
+
         return False
 
     if not extrair_produto_id(
         produto
     ):
+
         return False
 
     return True
@@ -781,6 +779,7 @@ def tamanho_compativel(
         medida is None
         or tipo is None
     ):
+
         return False
 
     try:
@@ -854,7 +853,7 @@ def tamanho_compativel(
 
 
 # =========================================================
-# CORRESPONDÊNCIA FORTE DE PREFERÊNCIA
+# PREFERÊNCIA FORTE
 # =========================================================
 
 def preferencia_corresponde(
@@ -895,7 +894,6 @@ def preferencia_corresponde(
         nome
     ).strip()
 
-    # Correspondência exata da expressão
     if preferencia in texto_produto:
         return True
 
@@ -910,14 +908,10 @@ def preferencia_corresponde(
     if not palavras:
         return False
 
-    # Para uma preferência com várias palavras,
-    # TODAS devem estar presentes.
-    todas_presentes = all(
+    return all(
         palavra in texto_produto
         for palavra in palavras
     )
-
-    return todas_presentes
 
 
 # =========================================================
@@ -1031,17 +1025,74 @@ def escolher_por_preferencia(
 
 
 # =========================================================
-# RELEVÂNCIA DO PRODUTO
+# NOVA CAMADA SEMÂNTICA
 # =========================================================
 
-def relevancia_produto(
+PALAVRAS_IGNORADAS = {
+    "de",
+    "da",
+    "do",
+    "das",
+    "dos",
+    "e",
+    "em",
+    "com",
+    "para",
+    "por",
+    "a",
+    "o"
+}
+
+
+def termos_significativos(
+    texto
+):
+
+    texto = normalizar_texto(
+        texto
+    )
+
+    return [
+        termo
+        for termo in texto.split()
+        if (
+            termo not in
+            PALAVRAS_IGNORADAS
+            and len(
+                termo
+            ) >= 2
+        )
+    ]
+
+
+def equivalencia_semantica(
     item,
     produto
 ):
 
-    termo = normalizar_texto(
+    """
+    Impede falsos positivos como:
+
+    Peito de frango
+    -> Galinha inteira
+
+    Papel manteiga
+    -> Manteiga
+
+    Creme dental infantil
+    -> Creme corporal
+
+    Quanto mais específico o termo,
+    mais conceitos precisam existir
+    no nome/categoria do produto.
+    """
+
+    termos = termos_significativos(
         item
     )
+
+    if not termos:
+        return True
 
     nome = normalizar_texto(
         produto.get(
@@ -1064,22 +1115,208 @@ def relevancia_produto(
         )
     )
 
-    if not termo:
-        return 0
+    departamento = normalizar_texto(
+        produto.get(
+            "departamento",
+            ""
+        )
+    )
 
-    if termo in nome:
-        return 1.0
+    texto_produto = (
+        nome +
+        " " +
+        categoria +
+        " " +
+        secao +
+        " " +
+        departamento
+    )
 
-    palavras = [
-        p
-        for p in termo.split()
-        if len(
-            p
-        ) >= 2
+    acertos = [
+        termo
+        for termo in termos
+        if termo in texto_produto
     ]
 
-    if not palavras:
+    # ---------------------------------------------
+    # 1 TERMO
+    # Ex.: Acetona
+    # ---------------------------------------------
+
+    if len(
+        termos
+    ) == 1:
+
+        return len(
+            acertos
+        ) == 1
+
+    # ---------------------------------------------
+    # 2 TERMOS
+    # TODOS SÃO OBRIGATÓRIOS
+    #
+    # Peito de frango
+    # -> exige PEITO + FRANGO
+    #
+    # Água micelar
+    # -> exige AGUA + MICELAR
+    # ---------------------------------------------
+
+    if len(
+        termos
+    ) == 2:
+
+        return len(
+            acertos
+        ) == 2
+
+    # ---------------------------------------------
+    # 3 OU MAIS TERMOS
+    # exige pelo menos 75%
+    # ---------------------------------------------
+
+    proporcao = (
+        len(
+            acertos
+        )
+        /
+        len(
+            termos
+        )
+    )
+
+    return proporcao >= 0.75
+
+
+# =========================================================
+# QUALIFICADORES
+# =========================================================
+
+QUALIFICADORES_ESPECIAIS = [
+
+    "defumado",
+    "defumada",
+
+    "light",
+
+    "diet",
+
+    "zero",
+
+    "premium",
+
+    "especial",
+
+    "gourmet",
+
+    "bifasico",
+    "bifasica",
+
+    "regenerador",
+    "regeneradora",
+
+    "detox",
+
+    "profissional",
+
+    "importado",
+    "importada",
+
+    "temperado",
+    "temperada",
+
+    "empanado",
+    "empanada",
+
+    "recheado",
+    "recheada"
+]
+
+
+def penalidade_qualificadores(
+    item,
+    produto
+):
+
+    """
+    Não exclui produtos especiais.
+    Apenas os penaliza quando o usuário
+    não pediu especificamente aquele atributo.
+
+    Ex.:
+    Peito de frango
+    -> peito cru/congelado vence peito defumado.
+
+    Água micelar
+    -> bifásica continua possível se for o
+       que realmente existe no mercado.
+    """
+
+    termo_item = normalizar_texto(
+        item
+    )
+
+    nome_produto = normalizar_texto(
+        produto.get(
+            "nome",
+            ""
+        )
+    )
+
+    penalidade = 0
+
+    for qualificador in QUALIFICADORES_ESPECIAIS:
+
+        if (
+            qualificador in nome_produto
+            and
+            qualificador not in termo_item
+        ):
+
+            penalidade += 0.25
+
+    return min(
+        penalidade,
+        1.0
+    )
+
+
+# =========================================================
+# RELEVÂNCIA
+# =========================================================
+
+def relevancia_produto(
+    item,
+    produto
+):
+
+    termos = termos_significativos(
+        item
+    )
+
+    if not termos:
         return 0
+
+    nome = normalizar_texto(
+        produto.get(
+            "nome",
+            ""
+        )
+    )
+
+    categoria = normalizar_texto(
+        produto.get(
+            "categoria",
+            ""
+        )
+    )
+
+    secao = normalizar_texto(
+        produto.get(
+            "secao",
+            ""
+        )
+    )
 
     texto = (
         nome +
@@ -1091,75 +1328,15 @@ def relevancia_produto(
 
     acertos = sum(
         1
-        for palavra in palavras
-        if palavra in texto
+        for termo in termos
+        if termo in texto
     )
 
     return (
         acertos /
         len(
-            palavras
+            termos
         )
-    )
-
-
-# =========================================================
-# PRODUTO PREMIUM / ESPECIAL
-# =========================================================
-
-def penalidade_premium(
-    produto
-):
-
-    texto = normalizar_texto(
-        (
-            str(
-                produto.get(
-                    "nome",
-                    ""
-                )
-            )
-            +
-            " "
-            +
-            str(
-                produto.get(
-                    "categoria",
-                    ""
-                )
-            )
-        )
-    )
-
-    termos_premium = [
-
-        "premium",
-        "especial",
-        "profissional",
-        "gourmet",
-        "importado",
-        "importada",
-        "regenerador",
-        "regeneradora",
-        "bifasica",
-        "bifasico",
-        "detox",
-        "expert",
-        "intense",
-        "pro",
-        "luxo",
-        "supreme"
-    ]
-
-    encontrados = sum(
-        1
-        for termo in termos_premium
-        if termo in texto
-    )
-
-    return min(
-        encontrados * 0.20,
-        0.60
     )
 
 
@@ -1174,11 +1351,6 @@ def tipo_medida_dominante(
     contagem = {}
 
     for produto in produtos:
-
-        if not produto_disponivel(
-            produto
-        ):
-            continue
 
         tipo = produto.get(
             "tipo_medida"
@@ -1208,7 +1380,7 @@ def tipo_medida_dominante(
 
 
 # =========================================================
-# TAMANHO MEDIANO
+# TAMANHO DE REFERÊNCIA
 # =========================================================
 
 def tamanho_referencia(
@@ -1220,14 +1392,10 @@ def tamanho_referencia(
 
     for produto in produtos:
 
-        if not produto_disponivel(
-            produto
-        ):
-            continue
-
         if produto.get(
             "tipo_medida"
         ) != tipo:
+
             continue
 
         try:
@@ -1269,6 +1437,7 @@ def penalidade_embalagem(
         medida is None
         or referencia is None
     ):
+
         return 0.40
 
     try:
@@ -1285,6 +1454,7 @@ def penalidade_embalagem(
             medida <= 0
             or referencia <= 0
         ):
+
             return 0.40
 
         razao = (
@@ -1292,26 +1462,25 @@ def penalidade_embalagem(
             referencia
         )
 
-        # Muito pequeno
         if razao < 0.40:
+
             return 1.20
 
-        # Pequeno
         if razao < 0.65:
+
             return 0.70
 
-        # Faixa comercial adequada
         if (
             razao >= 0.65
             and razao <= 1.60
         ):
+
             return 0
 
-        # Grande
         if razao <= 2.30:
+
             return 0.35
 
-        # Muito grande
         return 0.90
 
     except Exception:
@@ -1339,29 +1508,32 @@ def escolher_melhor_custo_beneficio(
     if not disponiveis:
         return None
 
-    # ---------------------------------------------
-    # Mantém apenas produtos razoavelmente
-    # relevantes para o termo buscado.
-    # ---------------------------------------------
+    # =====================================================
+    # FILTRO SEMÂNTICO
+    #
+    # ESTA É A CORREÇÃO PRINCIPAL.
+    # =====================================================
 
-    relevantes = []
-
-    for produto in disponiveis:
-
-        relevancia = relevancia_produto(
+    semanticamente_validos = [
+        produto
+        for produto in disponiveis
+        if equivalencia_semantica(
             item,
             produto
         )
+    ]
 
-        if relevancia >= 0.50:
+    # Se houver produtos semanticamente válidos,
+    # SOMENTE ELES entram no ranking.
+    if semanticamente_validos:
 
-            relevantes.append(
-                produto
-            )
+        disponiveis = (
+            semanticamente_validos
+        )
 
-    if relevantes:
-
-        disponiveis = relevantes
+    # Se nenhum produto passar no filtro,
+    # mantemos os resultados originais como fallback,
+    # evitando que produtos raros simplesmente desapareçam.
 
     tipo_dominante = (
         tipo_medida_dominante(
@@ -1379,14 +1551,17 @@ def escolher_melhor_custo_beneficio(
         )
 
     precos_absolutos = [
+
         produto.get(
             "preco_efetivo"
         )
+
         for produto in disponiveis
+
         if produto.get(
             "preco_efetivo"
-        )
-        is not None
+        ) is not None
+
     ]
 
     menor_preco = (
@@ -1398,24 +1573,30 @@ def escolher_melhor_custo_beneficio(
     )
 
     precos_medida = [
+
         produto.get(
             "preco_por_medida"
         )
+
         for produto in disponiveis
+
         if (
             produto.get(
                 "preco_por_medida"
             )
             is not None
-            and (
+            and
+            (
                 not tipo_dominante
-                or produto.get(
+                or
+                produto.get(
                     "tipo_medida"
                 )
                 ==
                 tipo_dominante
             )
         )
+
     ]
 
     menor_preco_medida = (
@@ -1451,13 +1632,17 @@ def escolher_melhor_custo_beneficio(
             produto
         )
 
+        semantica_ok = equivalencia_semantica(
+            item,
+            produto
+        )
+
         # -----------------------------------------
         # PREÇO ABSOLUTO
         # -----------------------------------------
 
         if (
             preco
-            and menor_preco
             and menor_preco > 0
         ):
 
@@ -1468,16 +1653,18 @@ def escolher_melhor_custo_beneficio(
 
         else:
 
-            score_preco_absoluto = 2.0
+            score_preco_absoluto = 2
 
         # -----------------------------------------
-        # PREÇO POR KG/L/UNIDADE
+        # PREÇO POR MEDIDA
         # -----------------------------------------
 
         if (
             preco_medida is not None
-            and menor_preco_medida
-            and menor_preco_medida > 0
+            and
+            menor_preco_medida
+            and
+            menor_preco_medida > 0
         ):
 
             score_preco_medida = (
@@ -1495,7 +1682,8 @@ def escolher_melhor_custo_beneficio(
 
         if (
             tipo_dominante
-            and tipo ==
+            and
+            tipo ==
             tipo_dominante
         ):
 
@@ -1511,21 +1699,34 @@ def escolher_melhor_custo_beneficio(
             penalidade_tamanho = 0.70
 
         # -----------------------------------------
-        # PREMIUM
+        # QUALIFICADORES ESPECIAIS
         # -----------------------------------------
 
-        premium = penalidade_premium(
-            produto
+        penalidade_especial = (
+            penalidade_qualificadores(
+                item,
+                produto
+            )
         )
 
         # -----------------------------------------
         # RELEVÂNCIA
-        # quanto menor melhor no score final
         # -----------------------------------------
 
         penalidade_relevancia = (
             1 -
             relevancia
+        )
+
+        # -----------------------------------------
+        # SEMÂNTICA
+        # fallback recebe penalidade alta
+        # -----------------------------------------
+
+        penalidade_semantica = (
+            0
+            if semantica_ok
+            else 2.0
         )
 
         # -----------------------------------------
@@ -1554,35 +1755,39 @@ def escolher_melhor_custo_beneficio(
 
             pass
 
-        # -----------------------------------------
+        # =================================================
         # SCORE FINAL
-        # menor é melhor
-        # -----------------------------------------
+        # =================================================
 
         score_final = (
 
             score_preco_absoluto
-            * 0.30
+            * 0.25
 
             +
 
             score_preco_medida
-            * 0.30
+            * 0.25
 
             +
 
             penalidade_tamanho
+            * 0.15
+
+            +
+
+            penalidade_especial
             * 0.20
 
             +
 
-            premium
-            * 0.10
+            penalidade_relevancia
+            * 0.15
 
             +
 
-            penalidade_relevancia
-            * 0.10
+            penalidade_semantica
+            * 1.00
 
             +
 
@@ -1602,33 +1807,18 @@ def escolher_melhor_custo_beneficio(
                         4
                     ),
 
-                "preco_absoluto_score":
-                    round(
-                        score_preco_absoluto,
-                        4
-                    ),
-
-                "preco_medida_score":
-                    round(
-                        score_preco_medida,
-                        4
-                    ),
-
-                "penalidade_tamanho":
-                    round(
-                        penalidade_tamanho,
-                        4
-                    ),
-
-                "penalidade_premium":
-                    round(
-                        premium,
-                        4
-                    ),
+                "semantica_ok":
+                    semantica_ok,
 
                 "relevancia":
                     round(
                         relevancia,
+                        4
+                    ),
+
+                "penalidade_especial":
+                    round(
+                        penalidade_especial,
                         4
                     )
             }
@@ -1640,6 +1830,7 @@ def escolher_melhor_custo_beneficio(
                 x[
                     "score"
                 ],
+
                 x[
                     "produto"
                 ].get(
@@ -1690,6 +1881,11 @@ def escolher_melhor_custo_beneficio(
                         "tipo_medida"
                     ),
 
+                "semantica_ok":
+                    candidato[
+                        "semantica_ok"
+                    ],
+
                 "score":
                     candidato[
                         "score"
@@ -1709,6 +1905,11 @@ def escolher_melhor_custo_beneficio(
                 "score"
             ],
 
+        "semantica_ok":
+            melhor[
+                "semantica_ok"
+            ],
+
         "tipo_medida_referencia":
             tipo_dominante,
 
@@ -1721,7 +1922,7 @@ def escolher_melhor_custo_beneficio(
 
 
 # =========================================================
-# DECISÃO DO ITEM
+# DECIDIR ITEM
 # =========================================================
 
 def decidir_item(
@@ -1764,7 +1965,7 @@ def decidir_item(
         }
 
     # =====================================================
-    # COM PREFERÊNCIA
+    # COM PREFERÊNCIAS
     # =====================================================
 
     if preferencias:
@@ -1872,9 +2073,9 @@ def decidir_item(
 
         "motivo":
             (
-                "Escolhido por melhor equilíbrio entre "
-                "preço total, preço proporcional, tamanho "
-                "de embalagem, relevância e disponibilidade."
+                "Escolhido após validação semântica "
+                "do produto e comparação de preço, "
+                "embalagem e disponibilidade."
             ),
 
         "criterio":
@@ -1882,6 +2083,11 @@ def decidir_item(
                 "score":
                     custo[
                         "score"
+                    ],
+
+                "semantica_ok":
+                    custo[
+                        "semantica_ok"
                     ],
 
                 "tipo_medida_referencia":
@@ -2234,6 +2440,7 @@ def obter_auth_token():
             parsed,
             str
         ):
+
             return parsed
 
         if isinstance(
