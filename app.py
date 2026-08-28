@@ -55,7 +55,7 @@ def parse_preferencias(texto):
 
             try:
                 limite = float(limite)
-            except:
+            except Exception:
                 limite = None
 
             preferencias.append(
@@ -81,7 +81,8 @@ def extrair_preco(texto):
     """
     Converte textos como:
     R$ 12,99
-    em:
+
+    Para:
     12.99
     """
 
@@ -105,11 +106,81 @@ def extrair_preco(texto):
 
     try:
         return float(valor)
-    except:
+    except Exception:
         return None
 
 
+def criar_browser(playwright):
+    """
+    Cria o navegador Chromium usando
+    configurações adequadas ao Render.
+    """
+
+    browser = playwright.chromium.launch(
+        headless=True,
+        args=[
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--disable-setuid-sandbox"
+        ]
+    )
+
+    return browser
+
+
+def criar_pagina(browser):
+    """
+    Cria uma página com tamanho de desktop.
+    """
+
+    page = browser.new_page(
+        viewport={
+            "width": 1440,
+            "height": 900
+        },
+        locale="pt-BR"
+    )
+
+    return page
+
+
+def abrir_mateus(page):
+    """
+    Abre diretamente a loja
+    Supermercado Mateus Cohama.
+    """
+
+    page.goto(
+        MATEUS_URL,
+        wait_until="domcontentloaded",
+        timeout=60000
+    )
+
+    page.wait_for_timeout(
+        4000
+    )
+
+    return {
+        "titulo": page.title(),
+        "url": page.url
+    }
+
+
 def login_mateus(page):
+    """
+    Estrutura inicial do login.
+
+    As credenciais serão configuradas
+    no Render usando variáveis de ambiente:
+
+    MATEUS_LOGIN
+    MATEUS_SENHA
+
+    Ainda não tentamos fazer login porque
+    primeiro estamos identificando os
+    elementos reais do site.
+    """
 
     usuario = os.getenv(
         "MATEUS_LOGIN"
@@ -120,28 +191,14 @@ def login_mateus(page):
     )
 
     if not usuario or not senha:
+
         raise Exception(
             "Credenciais do Mateus não configuradas."
         )
 
-    page.goto(
-        MATEUS_URL,
-        wait_until="domcontentloaded",
-        timeout=60000
+    abrir_mateus(
+        page
     )
-
-    page.wait_for_timeout(
-        3000
-    )
-
-    """
-    IMPORTANTE:
-    Os seletores de login abaixo ainda serão
-    ajustados após nosso primeiro teste real.
-
-    Por enquanto esta função apenas prepara
-    a estrutura.
-    """
 
     return {
         "status": "login_pendente_validacao"
@@ -153,59 +210,57 @@ def pesquisar_produto(
     nome,
     preferencias
 ):
-
     """
-    Nesta primeira versão vamos validar
-    somente abertura do site e estrutura.
+    Primeira estrutura da busca.
 
-    Depois vamos preencher:
-    - campo de busca
-    - resultados
-    - preços
-    - produto escolhido
-    - adicionar ao carrinho
+    Ainda não clica em produtos.
+    Primeiro estamos identificando
+    corretamente a estrutura do Mateus Mais.
     """
 
     resultado = {
+
         "item": nome,
+
         "status": "pendente",
+
         "produto_encontrado": None,
+
         "preco": None,
-        "mensagem": ""
+
+        "mensagem": "",
+
+        "preferencias_interpretadas":
+            preferencias
+
     }
 
     try:
 
-        page.goto(
-            MATEUS_URL,
-            wait_until="domcontentloaded",
-            timeout=60000
+        abrir_mateus(
+            page
         )
 
-        page.wait_for_timeout(
-            2000
+        resultado["status"] = (
+            "site_aberto"
         )
-
-        titulo = page.title()
-
-        resultado["status"] = "site_aberto"
 
         resultado["mensagem"] = (
             "Mateus Mais abriu corretamente. "
-            f"Título da página: {titulo}"
-        )
-
-        resultado["preferencias_interpretadas"] = (
-            preferencias
+            f"Título da página: {page.title()}"
         )
 
         return resultado
 
     except Exception as e:
 
-        resultado["status"] = "erro"
+        resultado["status"] = (
+            "erro"
+        )
 
-        resultado["mensagem"] = str(e)
+        resultado["mensagem"] = (
+            str(e)
+        )
 
         return resultado
 
@@ -218,9 +273,23 @@ def home():
 
     return jsonify(
         {
-            "status": "online",
-            "servico": "Agente Lista de Compras",
-            "mercado": "Mateus Cohama"
+
+            "status":
+                "online",
+
+            "servico":
+                "Agente Lista de Compras",
+
+            "mercado":
+                "Mateus Cohama",
+
+            "rotas": [
+                "/",
+                "/teste",
+                "/diagnostico",
+                "/executar-compra"
+            ]
+
         }
     )
 
@@ -235,37 +304,32 @@ def teste():
 
         with sync_playwright() as p:
 
-            browser = p.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage"
-                ]
+            browser = criar_browser(
+                p
             )
 
-            page = browser.new_page()
-
-            page.goto(
-                MATEUS_URL,
-                wait_until="domcontentloaded",
-                timeout=60000
+            page = criar_pagina(
+                browser
             )
 
-            page.wait_for_timeout(
-                3000
+            dados_site = abrir_mateus(
+                page
             )
-
-            titulo = page.title()
-
-            url_final = page.url
 
             browser.close()
 
         return jsonify(
             {
-                "status": "ok",
-                "titulo": titulo,
-                "url": url_final
+
+                "status":
+                    "ok",
+
+                "titulo":
+                    dados_site["titulo"],
+
+                "url":
+                    dados_site["url"]
+
             }
         )
 
@@ -273,9 +337,199 @@ def teste():
 
         return jsonify(
             {
-                "status": "erro",
-                "erro": str(e),
-                "trace": traceback.format_exc()
+
+                "status":
+                    "erro",
+
+                "erro":
+                    str(e),
+
+                "trace":
+                    traceback.format_exc()
+
+            }
+        ), 500
+
+
+@app.route(
+    "/diagnostico",
+    methods=["GET"]
+)
+def diagnostico():
+    """
+    Esta rota serve para descobrir
+    como o site Mateus Mais está estruturado.
+
+    Ela lista:
+    - inputs
+    - buttons
+    - links
+
+    Assim identificamos o campo de busca,
+    botão de login, carrinho etc.
+    """
+
+    try:
+
+        with sync_playwright() as p:
+
+            browser = criar_browser(
+                p
+            )
+
+            page = criar_pagina(
+                browser
+            )
+
+            abrir_mateus(
+                page
+            )
+
+            page.wait_for_timeout(
+                3000
+            )
+
+            inputs = (
+                page
+                .locator(
+                    "input"
+                )
+                .evaluate_all(
+                    """
+                    elements => elements.map(
+                        (el, i) => ({
+                            indice: i,
+                            type: el.type || "",
+                            name: el.name || "",
+                            id: el.id || "",
+                            placeholder: el.placeholder || "",
+                            ariaLabel:
+                                el.getAttribute('aria-label') || "",
+                            autocomplete:
+                                el.getAttribute('autocomplete') || "",
+                            className:
+                                typeof el.className === 'string'
+                                ? el.className
+                                : ""
+                        })
+                    )
+                    """
+                )
+            )
+
+            buttons = (
+                page
+                .locator(
+                    "button"
+                )
+                .evaluate_all(
+                    """
+                    elements => elements
+                    .slice(0, 100)
+                    .map(
+                        (el, i) => ({
+                            indice: i,
+                            texto:
+                                (el.innerText || "").trim(),
+                            ariaLabel:
+                                el.getAttribute('aria-label') || "",
+                            title:
+                                el.getAttribute('title') || "",
+                            type:
+                                el.getAttribute('type') || "",
+                            className:
+                                typeof el.className === 'string'
+                                ? el.className
+                                : ""
+                        })
+                    )
+                    """
+                )
+            )
+
+            links = (
+                page
+                .locator(
+                    "a"
+                )
+                .evaluate_all(
+                    """
+                    elements => elements
+                    .slice(0, 150)
+                    .map(
+                        (el, i) => ({
+                            indice: i,
+                            texto:
+                                (el.innerText || "").trim(),
+                            href:
+                                el.href || "",
+                            ariaLabel:
+                                el.getAttribute('aria-label') || "",
+                            title:
+                                el.getAttribute('title') || ""
+                        })
+                    )
+                    """
+                )
+            )
+
+            titulo = (
+                page.title()
+            )
+
+            url = (
+                page.url
+            )
+
+            browser.close()
+
+        return jsonify(
+            {
+
+                "status":
+                    "ok",
+
+                "titulo":
+                    titulo,
+
+                "url":
+                    url,
+
+                "quantidade_inputs":
+                    len(inputs),
+
+                "quantidade_buttons":
+                    len(buttons),
+
+                "quantidade_links":
+                    len(links),
+
+                "inputs":
+                    inputs,
+
+                "buttons":
+                    buttons,
+
+                "links":
+                    links
+
+            }
+        )
+
+    except Exception as e:
+
+        return jsonify(
+            {
+
+                "status":
+                    "erro",
+
+                "erro":
+                    str(e),
+
+                "trace":
+                    traceback.format_exc()
+
             }
         ), 500
 
@@ -301,8 +555,13 @@ def executar_compra():
 
             return jsonify(
                 {
-                    "status": "erro",
-                    "mensagem": "Nenhum item recebido."
+
+                    "status":
+                        "erro",
+
+                    "mensagem":
+                        "Nenhum item recebido."
+
                 }
             ), 400
 
@@ -312,19 +571,12 @@ def executar_compra():
 
         with sync_playwright() as p:
 
-            browser = p.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage"
-                ]
+            browser = criar_browser(
+                p
             )
 
-            page = browser.new_page(
-                viewport={
-                    "width": 1440,
-                    "height": 900
-                }
+            page = criar_pagina(
+                browser
             )
 
 
@@ -338,6 +590,7 @@ def executar_compra():
                     )
                     .strip()
                 )
+
 
                 preferencias = (
                     parse_preferencias(
@@ -366,6 +619,14 @@ def executar_compra():
                 )
 
 
+                resultado["observacao"] = (
+                    item.get(
+                        "observacao",
+                        ""
+                    )
+                )
+
+
                 resultados.append(
                     resultado
                 )
@@ -376,10 +637,21 @@ def executar_compra():
 
         return jsonify(
             {
-                "status": "ok",
-                "mercado": "Supermercado Mateus Cohama",
-                "quantidade_itens": len(resultados),
-                "resultados": resultados
+
+                "status":
+                    "ok",
+
+                "mercado":
+                    "Supermercado Mateus Cohama",
+
+                "quantidade_itens":
+                    len(
+                        resultados
+                    ),
+
+                "resultados":
+                    resultados
+
             }
         )
 
@@ -388,9 +660,16 @@ def executar_compra():
 
         return jsonify(
             {
-                "status": "erro",
-                "erro": str(e),
-                "trace": traceback.format_exc()
+
+                "status":
+                    "erro",
+
+                "erro":
+                    str(e),
+
+                "trace":
+                    traceback.format_exc()
+
             }
         ), 500
 
