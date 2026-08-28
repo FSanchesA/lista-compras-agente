@@ -4,6 +4,7 @@ from playwright.sync_api import sync_playwright
 import os
 import re
 import json
+import time
 import traceback
 import requests
 
@@ -22,7 +23,13 @@ MATEUS_URL = (
     "loja/supermercado-mateus-cohama"
 )
 
-MATEUS_BASE = "https://mateusmais.com.br"
+MATEUS_BASE = (
+    "https://mateusmais.com.br"
+)
+
+MATEUS_APP_API = (
+    "https://app.mateusmais.com.br"
+)
 
 MATEUS_API = (
     "https://app.mateusmais.com.br/"
@@ -37,9 +44,21 @@ INDEX_PRODUTOS = (
     "SHOWCASE_catalog_product_api_index_PROD"
 )
 
+SESSION_FILE = (
+    "/tmp/mateus_storage_state.json"
+)
+
+SESSION_META_FILE = (
+    "/tmp/mateus_session_meta.json"
+)
+
+SESSION_MAX_AGE = (
+    60 * 60 * 8
+)
+
 
 # =========================================================
-# NORMALIZAR TEXTO
+# NORMALIZAÇÃO
 # =========================================================
 
 def normalizar_texto(texto):
@@ -65,6 +84,7 @@ def normalizar_texto(texto):
     }
 
     for origem, destino in substituicoes.items():
+
         texto = texto.replace(
             origem,
             destino
@@ -125,9 +145,13 @@ def parse_preferencias(texto):
             )
 
             try:
-                limite = float(valor)
+
+                limite = float(
+                    valor
+                )
 
             except Exception:
+
                 limite = None
 
 
@@ -160,7 +184,7 @@ def parse_preferencias(texto):
 
 
 # =========================================================
-# EXTRAIR TAMANHO
+# TAMANHO
 # =========================================================
 
 def extrair_tamanho(texto):
@@ -228,10 +252,6 @@ def extrair_tamanho(texto):
     return None
 
 
-# =========================================================
-# REMOVER TAMANHO
-# =========================================================
-
 def remover_tamanho(texto):
 
     if not texto:
@@ -254,7 +274,7 @@ def remover_tamanho(texto):
 
 
 # =========================================================
-# PREÇO EFETIVO
+# PREÇO
 # =========================================================
 
 def preco_efetivo(produto):
@@ -459,12 +479,11 @@ def normalizar_produto(produto):
             ) or produto.get(
                 "image"
             )
-
     }
 
 
 # =========================================================
-# BUSCA DIRETA NA API
+# BUSCA API
 # =========================================================
 
 def buscar_produtos_api(
@@ -526,7 +545,6 @@ def buscar_produtos_api(
 
         "service":
             "meilisearch"
-
     }
 
     headers = {
@@ -548,7 +566,6 @@ def buscar_produtos_api(
                 "(KHTML, like Gecko) "
                 "Chrome/151 Safari/537.36"
             )
-
     }
 
     resposta = requests.post(
@@ -575,14 +592,11 @@ def buscar_produtos_api(
     ]
 
     return {
-
         "termo":
             termo,
 
         "quantidade":
-            len(
-                produtos
-            ),
+            len(produtos),
 
         "produtos":
             produtos
@@ -590,7 +604,7 @@ def buscar_produtos_api(
 
 
 # =========================================================
-# TAMANHO COMPATÍVEL
+# COMPATIBILIDADE
 # =========================================================
 
 def tamanho_compativel(
@@ -601,129 +615,96 @@ def tamanho_compativel(
     if not tamanho:
         return True
 
-    medida_produto = produto.get(
+    medida = produto.get(
         "medida"
     )
 
-    tipo_produto = produto.get(
+    tipo = produto.get(
         "tipo_medida"
     )
 
     if (
-        medida_produto is None
-        or tipo_produto is None
+        medida is None
+        or tipo is None
     ):
 
         return False
 
     try:
 
-        medida_produto = float(
-            medida_produto
+        medida = float(
+            medida
         )
 
     except Exception:
 
         return False
 
-    valor_preferencia = float(
+
+    valor = float(
         tamanho[
             "valor"
         ]
     )
 
-    tipo_preferencia = tamanho[
+    tipo_pref = tamanho[
         "tipo"
     ]
 
-    if tipo_produto == tipo_preferencia:
+
+    if tipo == tipo_pref:
 
         return abs(
-            medida_produto -
-            valor_preferencia
+            medida -
+            valor
         ) < 0.01
 
 
     if (
-        tipo_produto == "G"
-        and tipo_preferencia == "KG"
+        tipo == "G"
+        and tipo_pref == "KG"
     ):
 
         return abs(
-            medida_produto -
-            (
-                valor_preferencia *
-                1000
-            )
+            medida -
+            valor * 1000
         ) < 1
 
 
     if (
-        tipo_produto == "KG"
-        and tipo_preferencia == "G"
+        tipo == "KG"
+        and tipo_pref == "G"
     ):
 
         return abs(
-            (
-                medida_produto *
-                1000
-            ) -
-            valor_preferencia
+            medida * 1000 -
+            valor
         ) < 1
 
 
     if (
-        tipo_produto == "ML"
-        and tipo_preferencia == "L"
+        tipo == "ML"
+        and tipo_pref == "L"
     ):
 
         return abs(
-            medida_produto -
-            (
-                valor_preferencia *
-                1000
-            )
+            medida -
+            valor * 1000
         ) < 1
 
 
     if (
-        tipo_produto == "L"
-        and tipo_preferencia == "ML"
+        tipo == "L"
+        and tipo_pref == "ML"
     ):
 
         return abs(
-            (
-                medida_produto *
-                1000
-            ) -
-            valor_preferencia
+            medida * 1000 -
+            valor
         ) < 1
 
 
     return False
-
-
-# =========================================================
-# SCORE PREFERÊNCIA
-# =========================================================
-
-def palavras_preferencia(
-    descricao
-):
-
-    descricao_sem_tamanho = remover_tamanho(
-        descricao
-    )
-
-    texto = normalizar_texto(
-        descricao_sem_tamanho
-    )
-
-    return [
-        p
-        for p in texto.split()
-        if len(p) >= 2
-    ]
 
 
 def score_compatibilidade(
@@ -731,51 +712,55 @@ def score_compatibilidade(
     descricao
 ):
 
-    palavras = palavras_preferencia(
+    descricao = remover_tamanho(
         descricao
     )
+
+    palavras = [
+        x
+        for x in normalizar_texto(
+            descricao
+        ).split()
+        if len(x) >= 2
+    ]
 
     if not palavras:
         return 0
 
-    marca = normalizar_texto(
-        produto.get(
-            "marca",
-            ""
+    texto_produto = normalizar_texto(
+        (
+            str(
+                produto.get(
+                    "marca",
+                    ""
+                )
+            )
+            +
+            " "
+            +
+            str(
+                produto.get(
+                    "nome",
+                    ""
+                )
+            )
         )
     )
 
-    nome = normalizar_texto(
-        produto.get(
-            "nome",
-            ""
-        )
+    acertos = sum(
+        1
+        for palavra in palavras
+        if palavra in texto_produto
     )
-
-    texto_produto = (
-        marca +
-        " " +
-        nome
-    )
-
-    acertos = 0
-
-    for palavra in palavras:
-
-        if palavra in texto_produto:
-
-            acertos += 1
 
     return (
         acertos /
-        len(
-            palavras
-        )
+        len(palavras)
     )
 
 
 # =========================================================
-# ESCOLHER POR PREFERÊNCIA
+# ESCOLHA AUTOMÁTICA
 # =========================================================
 
 def escolher_por_preferencia(
@@ -860,46 +845,40 @@ def escolher_por_preferencia(
                 }
             )
 
+
         if candidatos:
 
             melhor_score = max(
-                candidato[
-                    "score"
-                ]
-                for candidato
-                in candidatos
+                x["score"]
+                for x in candidatos
             )
 
             melhores = [
-                candidato
-                for candidato
-                in candidatos
+                x
+                for x in candidatos
                 if abs(
-                    candidato[
-                        "score"
-                    ] -
+                    x["score"] -
                     melhor_score
                 ) < 0.0001
             ]
 
             melhores.sort(
                 key=lambda x:
-                    x[
-                        "produto"
-                    ].get(
+                    x["produto"].get(
                         "preco_efetivo"
                     )
                     or 999999
             )
 
-            escolhido = melhores[
-                0
-            ][
-                "produto"
-            ]
+            escolhido = (
+                melhores[
+                    0
+                ][
+                    "produto"
+                ]
+            )
 
             return {
-
                 "status":
                     "PREFERENCIA_ATENDIDA",
 
@@ -920,17 +899,13 @@ def escolher_por_preferencia(
 
                 "motivo":
                     (
-                        f"Preferência nº {prioridade} "
-                        "atendida."
+                        f"Preferência nº "
+                        f"{prioridade} atendida."
                     )
             }
 
     return None
 
-
-# =========================================================
-# ALTERNATIVA MELHOR CUSTO
-# =========================================================
 
 def sugerir_alternativa(
     item,
@@ -960,7 +935,6 @@ def sugerir_alternativa(
     ]
 
     if not disponiveis:
-
         return None
 
     disponiveis.sort(
@@ -985,10 +959,6 @@ def sugerir_alternativa(
     ]
 
 
-# =========================================================
-# DECIDIR ITEM
-# =========================================================
-
 def decidir_item(
     nome,
     preferencias_texto
@@ -1008,8 +978,6 @@ def decidir_item(
         []
     )
 
-    escolha = None
-
     if preferencias:
 
         escolha = escolher_por_preferencia(
@@ -1018,9 +986,10 @@ def decidir_item(
             produtos
         )
 
-    if escolha:
+        if escolha:
 
-        return escolha
+            return escolha
+
 
     sugestao = sugerir_alternativa(
         nome,
@@ -1028,7 +997,6 @@ def decidir_item(
     )
 
     return {
-
         "status":
             (
                 "PREFERENCIA_NAO_ATENDIDA"
@@ -1064,127 +1032,82 @@ def criar_browser(playwright):
     )
 
 
-def criar_contexto(browser):
+# =========================================================
+# SESSÃO
+# =========================================================
 
-    return browser.new_context(
-        viewport={
-            "width": 1440,
-            "height": 900
-        },
-        locale="pt-BR"
-    )
+def sessao_existe():
 
+    if not os.path.exists(
+        SESSION_FILE
+    ):
 
-def criar_pagina(contexto):
-
-    return contexto.new_page()
+        return False
 
 
-def abrir_mateus(page):
+    if not os.path.exists(
+        SESSION_META_FILE
+    ):
 
-    page.goto(
-        MATEUS_URL,
-        wait_until="domcontentloaded",
-        timeout=60000
-    )
+        return False
 
-    page.wait_for_timeout(
-        3000
-    )
 
-    return {
+    try:
 
-        "titulo":
-            page.title(),
+        with open(
+            SESSION_META_FILE,
+            "r"
+        ) as arquivo:
 
-        "url":
-            page.url
-    }
+            meta = json.load(
+                arquivo
+            )
+
+
+        criado = meta.get(
+            "timestamp",
+            0
+        )
+
+
+        idade = (
+            time.time() -
+            criado
+        )
+
+
+        return (
+            idade <
+            SESSION_MAX_AGE
+        )
+
+
+    except Exception:
+
+        return False
+
+
+def salvar_meta_sessao():
+
+    with open(
+        SESSION_META_FILE,
+        "w"
+    ) as arquivo:
+
+        json.dump(
+            {
+                "timestamp":
+                    time.time()
+            },
+            arquivo
+        )
 
 
 # =========================================================
-# ABRIR ÁREA DE LOGIN
+# LOGIN E SALVAR SESSÃO
 # =========================================================
 
-def abrir_login(page):
-
-    abrir_mateus(
-        page
-    )
-
-    textos = [
-        "Entrar",
-        "Login",
-        "Acessar",
-        "Minha conta"
-    ]
-
-    for texto in textos:
-
-        try:
-
-            botao = page.get_by_text(
-                texto,
-                exact=False
-            ).first
-
-            if botao.is_visible(
-                timeout=1500
-            ):
-
-                botao.click()
-
-                page.wait_for_timeout(
-                    1500
-                )
-
-                return True
-
-        except Exception:
-            pass
-
-
-    seletores = [
-        'button:has-text("Entrar")',
-        'a:has-text("Entrar")',
-        '[aria-label*="entrar" i]',
-        '[aria-label*="login" i]',
-        '[href*="login"]',
-        '[href*="auth"]'
-    ]
-
-    for seletor in seletores:
-
-        try:
-
-            elemento = page.locator(
-                seletor
-            ).first
-
-            if elemento.is_visible(
-                timeout=1000
-            ):
-
-                elemento.click()
-
-                page.wait_for_timeout(
-                    1500
-                )
-
-                return True
-
-        except Exception:
-            pass
-
-
-    return False
-
-
-# =========================================================
-# LOGIN AUTOMÁTICO
-# =========================================================
-
-def login_mateus(page):
+def gerar_sessao():
 
     usuario = os.getenv(
         "MATEUS_LOGIN"
@@ -1197,325 +1120,228 @@ def login_mateus(page):
     if not usuario or not senha:
 
         raise Exception(
-            "MATEUS_LOGIN e MATEUS_SENHA "
-            "não estão configurados no Render."
+            "Credenciais do Mateus "
+            "não configuradas no Render."
         )
 
 
-    abriu_login = abrir_login(
-        page
-    )
+    with sync_playwright() as p:
+
+        browser = criar_browser(
+            p
+        )
 
 
-    page.wait_for_timeout(
-        1000
-    )
+        context = browser.new_context(
+            viewport={
+                "width": 1440,
+                "height": 900
+            },
+            locale="pt-BR"
+        )
 
 
-    # -------------------------------------------------
-    # PRIMEIRO CAMPO: CPF / TELEFONE / E-MAIL
-    # -------------------------------------------------
-
-    candidatos_usuario = [
-
-        'input[type="tel"]',
-
-        'input[type="email"]',
-
-        'input[name*="cpf" i]',
-
-        'input[name*="phone" i]',
-
-        'input[name*="login" i]',
-
-        'input[placeholder*="cpf" i]',
-
-        'input[placeholder*="telefone" i]',
-
-        'input[placeholder*="celular" i]',
-
-        'input[type="text"]'
-
-    ]
+        page = context.new_page()
 
 
-    campo_usuario = None
+        page.goto(
+            "https://mateusmais.com.br/login",
+            wait_until="domcontentloaded",
+            timeout=60000
+        )
 
 
-    for seletor in candidatos_usuario:
+        page.locator(
+            "#login"
+        ).wait_for(
+            state="visible",
+            timeout=30000
+        )
+
+
+        page.locator(
+            "#login"
+        ).fill(
+            usuario
+        )
+
+
+        page.locator(
+            "#password"
+        ).fill(
+            senha
+        )
+
+
+        page.locator(
+            'button[type="submit"]'
+        ).click()
+
 
         try:
 
-            loc = page.locator(
-                seletor
+            page.wait_for_url(
+                lambda url:
+                    "/login"
+                    not in url,
+                timeout=60000
             )
 
-            for i in range(
-                min(
-                    loc.count(),
-                    10
-                )
-            ):
-
-                el = loc.nth(
-                    i
-                )
-
-                placeholder = (
-                    el.get_attribute(
-                        "placeholder"
-                    ) or ""
-                ).lower()
-
-
-                if (
-                    "00000-000"
-                    in placeholder
-                    or "pesquise"
-                    in placeholder
-                ):
-
-                    continue
-
-
-                if el.is_visible():
-
-                    campo_usuario = el
-
-                    break
-
-            if campo_usuario:
-                break
-
         except Exception:
+
             pass
 
 
-    if not campo_usuario:
-
-        return {
-
-            "status":
-                "CAMPO_USUARIO_NAO_ENCONTRADO",
-
-            "abriu_login":
-                abriu_login,
-
-            "url":
-                page.url
-
-        }
-
-
-    campo_usuario.fill(
-        usuario
-    )
-
-
-    page.wait_for_timeout(
-        500
-    )
-
-
-    # -------------------------------------------------
-    # TENTA CONTINUAR CASO LOGIN SEJA EM DUAS ETAPAS
-    # -------------------------------------------------
-
-    botoes_continuar = [
-
-        'button:has-text("Continuar")',
-
-        'button:has-text("Avançar")',
-
-        'button:has-text("Entrar")',
-
-        'button:has-text("Acessar")'
-
-    ]
-
-
-    for seletor in botoes_continuar:
-
-        try:
-
-            botao = page.locator(
-                seletor
-            ).first
-
-            if botao.is_visible(
-                timeout=500
-            ):
-
-                botao.click()
-
-                page.wait_for_timeout(
-                    1500
-                )
-
-                break
-
-        except Exception:
-            pass
-
-
-    # -------------------------------------------------
-    # SENHA
-    # -------------------------------------------------
-
-    campo_senha = page.locator(
-        'input[type="password"]'
-    ).first
-
-
-    try:
-
-        campo_senha.wait_for(
-            state="visible",
-            timeout=10000
-        )
-
-    except Exception:
-
-        return {
-
-            "status":
-                "CAMPO_SENHA_NAO_ENCONTRADO",
-
-            "url":
-                page.url
-
-        }
-
-
-    campo_senha.fill(
-        senha
-    )
-
-
-    page.wait_for_timeout(
-        400
-    )
-
-
-    # -------------------------------------------------
-    # ENTRAR
-    # -------------------------------------------------
-
-    clicou = False
-
-
-    for seletor in [
-
-        'button:has-text("Entrar")',
-
-        'button:has-text("Acessar")',
-
-        'button:has-text("Login")',
-
-        'button[type="submit"]'
-
-    ]:
-
-        try:
-
-            botao = page.locator(
-                seletor
-            ).first
-
-            if botao.is_visible(
-                timeout=700
-            ):
-
-                botao.click()
-
-                clicou = True
-
-                break
-
-        except Exception:
-            pass
-
-
-    if not clicou:
-
-        campo_senha.press(
-            "Enter"
+        page.wait_for_timeout(
+            2500
         )
 
 
-    page.wait_for_timeout(
-        4000
-    )
+        url_final = page.url
 
 
-    body = normalizar_texto(
-        page.locator(
-            "body"
-        ).inner_text(
-            timeout=5000
+        if "/login" in url_final:
+
+            browser.close()
+
+            raise Exception(
+                "Login não foi concluído."
+            )
+
+
+        context.storage_state(
+            path=SESSION_FILE
         )
-    )
 
 
-    sinais_login = [
-
-        "minha conta",
-
-        "meus pedidos",
-
-        "sair",
-
-        "ola",
-
-        "perfil"
-
-    ]
+        cookies = context.cookies()
 
 
-    autenticado = any(
-        sinal in body
-        for sinal in sinais_login
-    )
+        salvar_meta_sessao()
+
+
+        browser.close()
 
 
     return {
-
         "status":
-            (
-                "LOGIN_OK"
-                if autenticado
-                else "LOGIN_EXECUTADO_VALIDAR"
-            ),
+            "LOGIN_OK",
 
         "autenticado":
-            autenticado,
+            True,
+
+        "cookies_salvos":
+            len(cookies),
 
         "url":
-            page.url,
-
-        "titulo":
-            page.title()
-
+            url_final
     }
 
 
 # =========================================================
-# URL DO PRODUTO
+# GARANTIR SESSÃO
 # =========================================================
 
-def url_produto(
-    produto
-):
+def garantir_sessao():
 
-    product_id = produto.get(
-        "id"
+    if sessao_existe():
+
+        return {
+            "status":
+                "SESSAO_REUTILIZADA",
+
+            "nova":
+                False
+        }
+
+
+    resultado = gerar_sessao()
+
+
+    return {
+        "status":
+            resultado[
+                "status"
+            ],
+
+        "nova":
+            True
+    }
+
+
+# =========================================================
+# CONVERTER STORAGE STATE PARA REQUESTS
+# =========================================================
+
+def criar_requests_session():
+
+    if not sessao_existe():
+
+        gerar_sessao()
+
+
+    with open(
+        SESSION_FILE,
+        "r"
+    ) as arquivo:
+
+        state = json.load(
+            arquivo
+        )
+
+
+    session = requests.Session()
+
+
+    session.headers.update(
+        {
+            "User-Agent":
+                (
+                    "Mozilla/5.0 "
+                    "(Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) "
+                    "Chrome/151 Safari/537.36"
+                ),
+
+            "Accept":
+                "application/json, text/plain, */*",
+
+            "Referer":
+                "https://mateusmais.com.br/"
+        }
     )
 
-    return (
-        f"{MATEUS_BASE}/produtos/"
-        f"{MARKET_ID}/"
-        f"{product_id}"
-    )
+
+    for cookie in state.get(
+        "cookies",
+        []
+    ):
+
+        try:
+
+            session.cookies.set(
+                cookie.get(
+                    "name"
+                ),
+                cookie.get(
+                    "value"
+                ),
+                domain=cookie.get(
+                    "domain"
+                ),
+                path=cookie.get(
+                    "path",
+                    "/"
+                )
+            )
+
+        except Exception:
+
+            pass
+
+
+    return session
 
 
 # =========================================================
@@ -1530,7 +1356,6 @@ def home():
 
     return jsonify(
         {
-
             "status":
                 "online",
 
@@ -1540,64 +1365,115 @@ def home():
             "mercado":
                 "Mateus Cohama",
 
-            "market_id":
-                MARKET_ID,
+            "sessao_salva":
+                sessao_existe(),
 
             "rotas": [
-
                 "/",
-
-                "/teste",
-
-                "/api-buscar?q=arroz",
-
-                "/testar-escolha",
-
-                "/diagnostico-login",
-
-                "/teste-login",
-
-                "/capturar-carrinho",
-
-                "/executar-compra"
-
+                "/api-buscar?q=cafe",
+                "/executar-compra",
+                "/gerar-sessao",
+                "/status-sessao",
+                "/teste-sessao-http"
             ]
-
         }
     )
 
 
 # =========================================================
-# TESTE
+# STATUS DA SESSÃO
 # =========================================================
 
 @app.route(
-    "/teste",
+    "/status-sessao",
     methods=["GET"]
 )
-def teste():
+def status_sessao():
+
+    existe = sessao_existe()
+
+
+    idade = None
+
+
+    if (
+        existe
+        and os.path.exists(
+            SESSION_META_FILE
+        )
+    ):
+
+        try:
+
+            with open(
+                SESSION_META_FILE,
+                "r"
+            ) as arquivo:
+
+                meta = json.load(
+                    arquivo
+                )
+
+
+            idade = round(
+                time.time() -
+                meta.get(
+                    "timestamp",
+                    time.time()
+                ),
+                1
+            )
+
+        except Exception:
+
+            pass
+
+
+    return jsonify(
+        {
+            "status":
+                "ok",
+
+            "sessao_valida":
+                existe,
+
+            "idade_segundos":
+                idade,
+
+            "validade_maxima_segundos":
+                SESSION_MAX_AGE
+        }
+    )
+
+
+# =========================================================
+# GERAR SESSÃO
+# =========================================================
+
+@app.route(
+    "/gerar-sessao",
+    methods=["GET"]
+)
+def gerar_sessao_route():
 
     try:
 
-        with sync_playwright() as p:
+        inicio = time.time()
 
-            browser = criar_browser(
-                p
-            )
 
-            contexto = criar_contexto(
-                browser
-            )
+        resultado = gerar_sessao()
 
-            page = criar_pagina(
-                contexto
-            )
 
-            dados = abrir_mateus(
-                page
-            )
+        tempo = round(
+            time.time() -
+            inicio,
+            2
+        )
 
-            browser.close()
+
+        resultado[
+            "tempo_segundos"
+        ] = tempo
 
 
         return jsonify(
@@ -1605,15 +1481,84 @@ def teste():
                 "status":
                     "ok",
 
-                "titulo":
-                    dados[
-                        "titulo"
-                    ],
+                "sessao":
+                    resultado
+            }
+        )
 
-                "url":
-                    dados[
-                        "url"
-                    ]
+
+    except Exception as e:
+
+        return jsonify(
+            {
+                "status":
+                    "erro",
+
+                "erro":
+                    str(e),
+
+                "trace":
+                    traceback.format_exc()
+            }
+        ), 500
+
+
+# =========================================================
+# TESTAR SESSÃO VIA HTTP
+# =========================================================
+
+@app.route(
+    "/teste-sessao-http",
+    methods=["GET"]
+)
+def teste_sessao_http():
+
+    try:
+
+        inicio = time.time()
+
+
+        garantia = garantir_sessao()
+
+
+        session = criar_requests_session()
+
+
+        resposta = session.get(
+            MATEUS_URL,
+            timeout=30,
+            allow_redirects=True
+        )
+
+
+        tempo = round(
+            time.time() -
+            inicio,
+            2
+        )
+
+
+        return jsonify(
+            {
+                "status":
+                    "ok",
+
+                "sessao":
+                    garantia,
+
+                "http_status":
+                    resposta.status_code,
+
+                "url_final":
+                    resposta.url,
+
+                "tempo_segundos":
+                    tempo,
+
+                "cookies":
+                    len(
+                        session.cookies
+                    )
             }
         )
 
@@ -1652,104 +1597,9 @@ def api_buscar():
 
     try:
 
-        limite = int(
-            request.args.get(
-                "limite",
-                20
-            )
-        )
-
-    except Exception:
-
-        limite = 20
-
-
-    limite = max(
-        1,
-        min(
-            limite,
-            50
-        )
-    )
-
-
-    try:
-
         resultado = buscar_produtos_api(
             termo,
-            limite=limite
-        )
-
-
-        return jsonify(
-            {
-                "status":
-                    "ok",
-
-                "mercado":
-                    "Supermercado Mateus Cohama",
-
-                "resultado":
-                    resultado
-            }
-        )
-
-
-    except Exception as e:
-
-        return jsonify(
-            {
-                "status":
-                    "erro",
-
-                "erro":
-                    str(e),
-
-                "trace":
-                    traceback.format_exc()
-            }
-        ), 500
-
-
-# =========================================================
-# TESTAR ESCOLHA
-# =========================================================
-
-@app.route(
-    "/testar-escolha",
-    methods=["GET"]
-)
-def testar_escolha():
-
-    item = request.args.get(
-        "item",
-        ""
-    ).strip()
-
-    preferencias = request.args.get(
-        "preferencias",
-        ""
-    ).strip()
-
-
-    if not item:
-
-        return jsonify(
-            {
-                "status":
-                    "erro",
-
-                "mensagem":
-                    "Informe o item."
-            }
-        ), 400
-
-
-    try:
-
-        resultado = decidir_item(
-            item,
-            preferencias
+            limite=50
         )
 
 
@@ -1772,531 +1622,13 @@ def testar_escolha():
                     "erro",
 
                 "erro":
-                    str(e),
-
-                "trace":
-                    traceback.format_exc()
+                    str(e)
             }
         ), 500
 
 
 # =========================================================
-# DIAGNÓSTICO LOGIN
-# =========================================================
-
-@app.route(
-    "/diagnostico-login",
-    methods=["GET"]
-)
-def diagnostico_login():
-
-    try:
-
-        with sync_playwright() as p:
-
-            browser = criar_browser(
-                p
-            )
-
-            contexto = criar_contexto(
-                browser
-            )
-
-            page = criar_pagina(
-                contexto
-            )
-
-            abriu = abrir_login(
-                page
-            )
-
-            page.wait_for_timeout(
-                1500
-            )
-
-            inputs = []
-
-            loc_inputs = page.locator(
-                "input"
-            )
-
-            for i in range(
-                min(
-                    loc_inputs.count(),
-                    20
-                )
-            ):
-
-                el = loc_inputs.nth(
-                    i
-                )
-
-                try:
-
-                    inputs.append(
-                        {
-                            "indice":
-                                i,
-
-                            "type":
-                                el.get_attribute(
-                                    "type"
-                                ),
-
-                            "name":
-                                el.get_attribute(
-                                    "name"
-                                ),
-
-                            "id":
-                                el.get_attribute(
-                                    "id"
-                                ),
-
-                            "placeholder":
-                                el.get_attribute(
-                                    "placeholder"
-                                ),
-
-                            "autocomplete":
-                                el.get_attribute(
-                                    "autocomplete"
-                                ),
-
-                            "visivel":
-                                el.is_visible()
-                        }
-                    )
-
-                except Exception:
-                    pass
-
-
-            buttons = []
-
-            loc_buttons = page.locator(
-                "button"
-            )
-
-            for i in range(
-                min(
-                    loc_buttons.count(),
-                    30
-                )
-            ):
-
-                el = loc_buttons.nth(
-                    i
-                )
-
-                try:
-
-                    buttons.append(
-                        {
-                            "indice":
-                                i,
-
-                            "texto":
-                                (
-                                    el.inner_text(
-                                        timeout=500
-                                    ) or ""
-                                ).strip(),
-
-                            "type":
-                                el.get_attribute(
-                                    "type"
-                                ),
-
-                            "visivel":
-                                el.is_visible()
-                        }
-                    )
-
-                except Exception:
-                    pass
-
-
-            retorno = {
-
-                "status":
-                    "ok",
-
-                "login_aberto":
-                    abriu,
-
-                "url":
-                    page.url,
-
-                "titulo":
-                    page.title(),
-
-                "inputs":
-                    inputs,
-
-                "buttons":
-                    buttons
-            }
-
-
-            browser.close()
-
-
-        return jsonify(
-            retorno
-        )
-
-
-    except Exception as e:
-
-        return jsonify(
-            {
-                "status":
-                    "erro",
-
-                "erro":
-                    str(e),
-
-                "trace":
-                    traceback.format_exc()
-            }
-        ), 500
-
-
-# =========================================================
-# TESTE LOGIN REAL
-# =========================================================
-
-@app.route(
-    "/teste-login",
-    methods=["GET"]
-)
-def teste_login():
-
-    try:
-
-        with sync_playwright() as p:
-
-            browser = criar_browser(
-                p
-            )
-
-            contexto = criar_contexto(
-                browser
-            )
-
-            page = criar_pagina(
-                contexto
-            )
-
-            resultado = login_mateus(
-                page
-            )
-
-            browser.close()
-
-
-        return jsonify(
-            {
-                "status":
-                    "ok",
-
-                "login":
-                    resultado
-            }
-        )
-
-
-    except Exception as e:
-
-        return jsonify(
-            {
-                "status":
-                    "erro",
-
-                "erro":
-                    str(e),
-
-                "trace":
-                    traceback.format_exc()
-            }
-        ), 500
-
-
-# =========================================================
-# CAPTURAR API DO CARRINHO
-# =========================================================
-
-@app.route(
-    "/capturar-carrinho",
-    methods=["GET"]
-)
-def capturar_carrinho():
-
-    item = request.args.get(
-        "item",
-        "cafe"
-    ).strip()
-
-    preferencias_texto = request.args.get(
-        "preferencias",
-        ""
-    ).strip()
-
-
-    try:
-
-        decisao = decidir_item(
-            item,
-            preferencias_texto
-        )
-
-
-        produto = (
-            decisao.get(
-                "escolhido"
-            )
-            or decisao.get(
-                "sugestao"
-            )
-        )
-
-
-        if not produto:
-
-            return jsonify(
-                {
-                    "status":
-                        "erro",
-
-                    "mensagem":
-                        "Nenhum produto foi escolhido."
-                }
-            ), 400
-
-
-        capturas = []
-
-
-        with sync_playwright() as p:
-
-            browser = criar_browser(
-                p
-            )
-
-            contexto = criar_contexto(
-                browser
-            )
-
-            page = criar_pagina(
-                contexto
-            )
-
-
-            login = login_mateus(
-                page
-            )
-
-
-            # ---------------------------------------------
-            # ESCUTA REQUISIÇÕES DE CARRINHO
-            # ---------------------------------------------
-
-            def registrar_request(req):
-
-                try:
-
-                    if req.resource_type not in [
-                        "xhr",
-                        "fetch"
-                    ]:
-                        return
-
-
-                    url_lower = req.url.lower()
-
-
-                    palavras = [
-
-                        "cart",
-
-                        "basket",
-
-                        "checkout",
-
-                        "order",
-
-                        "carrinho",
-
-                        "bag",
-
-                        "shopping"
-
-                    ]
-
-
-                    if not any(
-                        palavra in url_lower
-                        for palavra in palavras
-                    ):
-
-                        return
-
-
-                    capturas.append(
-                        {
-                            "metodo":
-                                req.method,
-
-                            "url":
-                                req.url,
-
-                            "post_data":
-                                req.post_data,
-
-                            "content_type":
-                                req.headers.get(
-                                    "content-type",
-                                    ""
-                                )
-                        }
-                    )
-
-                except Exception:
-                    pass
-
-
-            page.on(
-                "request",
-                registrar_request
-            )
-
-
-            # ---------------------------------------------
-            # ABRIR PRODUTO
-            # ---------------------------------------------
-
-            produto_url = url_produto(
-                produto
-            )
-
-
-            page.goto(
-                produto_url,
-                wait_until="domcontentloaded",
-                timeout=60000
-            )
-
-
-            page.wait_for_timeout(
-                3000
-            )
-
-
-            # ---------------------------------------------
-            # TENTAR ADICIONAR
-            # ---------------------------------------------
-
-            clicou_adicionar = False
-
-
-            seletores = [
-
-                'button:has-text("Adicionar")',
-
-                'button:has-text("Comprar")',
-
-                'button:has-text("Adicionar ao carrinho")',
-
-                '[aria-label*="adicionar" i]'
-
-            ]
-
-
-            for seletor in seletores:
-
-                try:
-
-                    botao = page.locator(
-                        seletor
-                    ).first
-
-
-                    if botao.is_visible(
-                        timeout=1500
-                    ):
-
-                        botao.click()
-
-                        clicou_adicionar = True
-
-                        break
-
-                except Exception:
-                    pass
-
-
-            page.wait_for_timeout(
-                4000
-            )
-
-
-            retorno = {
-
-                "status":
-                    "ok",
-
-                "login":
-                    login,
-
-                "item":
-                    item,
-
-                "produto":
-                    produto,
-
-                "produto_url":
-                    produto_url,
-
-                "clicou_adicionar":
-                    clicou_adicionar,
-
-                "quantidade_chamadas":
-                    len(
-                        capturas
-                    ),
-
-                "chamadas":
-                    capturas
-            }
-
-
-            browser.close()
-
-
-        return jsonify(
-            retorno
-        )
-
-
-    except Exception as e:
-
-        return jsonify(
-            {
-                "status":
-                    "erro",
-
-                "erro":
-                    str(e),
-
-                "trace":
-                    traceback.format_exc()
-            }
-        ), 500
-
-
-# =========================================================
-# EXECUTAR COMPRA / ANÁLISE
+# EXECUTAR COMPRA - ANÁLISE
 # =========================================================
 
 @app.route(
@@ -2310,6 +1642,7 @@ def executar_compra():
         dados = request.get_json(
             force=True
         )
+
 
         itens = dados.get(
             "itens",
@@ -2336,28 +1669,22 @@ def executar_compra():
         for item in itens:
 
             nome = (
-                item
-                .get(
+                item.get(
                     "item",
                     ""
-                )
-                .strip()
+                ).strip()
             )
 
 
-            preferencias_texto = (
-                item.get(
-                    "preferencias",
-                    ""
-                )
+            preferencias = item.get(
+                "preferencias",
+                ""
             )
 
 
-            quantidade = (
-                item.get(
-                    "quantidade",
-                    "1"
-                )
+            quantidade = item.get(
+                "quantidade",
+                "1"
             )
 
 
@@ -2365,7 +1692,7 @@ def executar_compra():
 
                 resultado = decidir_item(
                     nome,
-                    preferencias_texto
+                    preferencias
                 )
 
 
@@ -2445,6 +1772,7 @@ if __name__ == "__main__":
             5000
         )
     )
+
 
     app.run(
         host="0.0.0.0",
