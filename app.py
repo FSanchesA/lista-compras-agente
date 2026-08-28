@@ -62,7 +62,7 @@ SESSION_MAX_AGE = (
 
 
 # =========================================================
-# NORMALIZAÇÃO
+# NORMALIZAÇÃO DE TEXTO
 # =========================================================
 
 def normalizar_texto(texto):
@@ -219,7 +219,6 @@ def extrair_tamanho(texto):
             r"(\d+(?:[.,]\d+)?)\s*ml",
             "ML"
         )
-
     ]
 
     for padrao, tipo in padroes:
@@ -298,7 +297,6 @@ def preco_efetivo(produto):
         produto.get(
             "price"
         )
-
     ]
 
     for valor in candidatos:
@@ -502,7 +500,6 @@ def buscar_produtos_api(
         [
             "for_sale:true"
         ]
-
     ]
 
     params_busca = urlencode(
@@ -1312,6 +1309,215 @@ def gerar_sessao():
 
 
 # =========================================================
+# LER STORAGE STATE
+# =========================================================
+
+def ler_storage_state():
+
+    if not os.path.exists(
+        SESSION_FILE
+    ):
+
+        return None
+
+    with open(
+        SESSION_FILE,
+        "r",
+        encoding="utf-8"
+    ) as arquivo:
+
+        return json.load(
+            arquivo
+        )
+
+
+# =========================================================
+# EXTRAIR VALOR DO LOCAL STORAGE
+# =========================================================
+
+def obter_local_storage(
+    chave_procurada
+):
+
+    state = ler_storage_state()
+
+    if not state:
+
+        return None
+
+    for origin in state.get(
+        "origins",
+        []
+    ):
+
+        for item in origin.get(
+            "localStorage",
+            []
+        ):
+
+            if item.get(
+                "name"
+            ) == chave_procurada:
+
+                return item.get(
+                    "value"
+                )
+
+    return None
+
+
+# =========================================================
+# EXTRAIR TOKEN DE AUTENTICAÇÃO
+# =========================================================
+
+def obter_auth_token():
+
+    valor = obter_local_storage(
+        "auth:token"
+    )
+
+    if not valor:
+
+        return None
+
+    # O valor no Mateus está serializado como JSON.
+    try:
+
+        parsed = json.loads(
+            valor
+        )
+
+        if isinstance(
+            parsed,
+            str
+        ):
+
+            return parsed
+
+        if isinstance(
+            parsed,
+            dict
+        ):
+
+            for chave in [
+                "token",
+                "access_token",
+                "accessToken",
+                "value"
+            ]:
+
+                if parsed.get(
+                    chave
+                ):
+
+                    return str(
+                        parsed[
+                            chave
+                        ]
+                    )
+
+    except Exception:
+
+        pass
+
+    return str(
+        valor
+    ).strip(
+        '"'
+    )
+
+
+# =========================================================
+# CRIAR SESSÃO HTTP AUTENTICADA
+# =========================================================
+
+def criar_requests_session(
+    incluir_auth=True
+):
+
+    session = requests.Session()
+
+    session.headers.update(
+        {
+            "User-Agent":
+                (
+                    "Mozilla/5.0 "
+                    "(Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) "
+                    "Chrome/151 Safari/537.36"
+                ),
+
+            "Accept":
+                "application/json, text/plain, */*",
+
+            "Origin":
+                "https://mateusmais.com.br",
+
+            "Referer":
+                "https://mateusmais.com.br/"
+        }
+    )
+
+    state = ler_storage_state()
+
+    if state:
+
+        for cookie in state.get(
+            "cookies",
+            []
+        ):
+
+            try:
+
+                session.cookies.set(
+                    cookie.get(
+                        "name"
+                    ),
+
+                    cookie.get(
+                        "value"
+                    ),
+
+                    domain=
+                        cookie.get(
+                            "domain"
+                        ),
+
+                    path=
+                        cookie.get(
+                            "path",
+                            "/"
+                        )
+                )
+
+            except Exception:
+
+                pass
+
+    if incluir_auth:
+
+        token = obter_auth_token()
+
+        if token:
+
+            # Primeira hipótese:
+            # Authorization Bearer.
+            # Não expomos o token em nenhum endpoint.
+            session.headers.update(
+                {
+                    "Authorization":
+                        (
+                            "Bearer " +
+                            token
+                        )
+                }
+            )
+
+    return session
+
+
+# =========================================================
 # GARANTIR SESSÃO
 # =========================================================
 
@@ -1343,288 +1549,50 @@ def garantir_sessao():
 
 
 # =========================================================
-# REQUESTS SESSION
+# DIAGNÓSTICO SEGURO DO TOKEN
 # =========================================================
 
-def criar_requests_session():
+def diagnosticar_token():
 
-    if not sessao_existe():
+    token = obter_auth_token()
 
-        gerar_sessao()
-
-    with open(
-        SESSION_FILE,
-        "r",
-        encoding="utf-8"
-    ) as arquivo:
-
-        state = json.load(
-            arquivo
-        )
-
-    session = requests.Session()
-
-    session.headers.update(
-        {
-            "User-Agent":
-                (
-                    "Mozilla/5.0 "
-                    "(Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) "
-                    "Chrome/151 Safari/537.36"
-                ),
-
-            "Accept":
-                "application/json, text/plain, */*",
-
-            "Referer":
-                "https://mateusmais.com.br/"
-        }
-    )
-
-    for cookie in state.get(
-        "cookies",
-        []
-    ):
-
-        try:
-
-            session.cookies.set(
-                cookie.get(
-                    "name"
-                ),
-
-                cookie.get(
-                    "value"
-                ),
-
-                domain=
-                    cookie.get(
-                        "domain"
-                    ),
-
-                path=
-                    cookie.get(
-                        "path",
-                        "/"
-                    )
-            )
-
-        except Exception:
-
-            pass
-
-    return session
-
-
-# =========================================================
-# IDENTIFICAR CHAVES DE AUTENTICAÇÃO
-# =========================================================
-
-def parece_chave_auth(
-    nome
-):
-
-    nome = normalizar_texto(
-        nome
-    )
-
-    palavras = [
-
-        "token",
-
-        "auth",
-
-        "access",
-
-        "refresh",
-
-        "jwt",
-
-        "bearer",
-
-        "session",
-
-        "login",
-
-        "user",
-
-        "customer",
-
-        "cliente",
-
-        "account",
-
-        "credential"
-
-    ]
-
-    return any(
-        palavra in nome
-        for palavra in palavras
-    )
-
-
-def descrever_valor_seguro(
-    valor
-):
-
-    if valor is None:
+    if not token:
 
         return {
 
-            "presente":
+            "token_encontrado":
                 False,
 
             "tamanho":
                 0,
 
-            "parece_json":
-                False,
-
-            "parece_jwt":
-                False
+            "prefixo":
+                None
         }
 
-    texto = str(
-        valor
-    )
+    prefixo = None
 
-    parece_json = False
+    if token.startswith(
+        "Bearer "
+    ):
 
-    try:
-
-        json.loads(
-            texto
-        )
-
-        parece_json = True
-
-    except Exception:
-
-        pass
-
-    partes_jwt = texto.split(
-        "."
-    )
-
-    parece_jwt = (
-        len(
-            partes_jwt
-        ) == 3
-        and all(
-            len(
-                parte
-            ) > 5
-            for parte in partes_jwt
-        )
-    )
+        prefixo = "Bearer"
 
     return {
 
-        "presente":
+        "token_encontrado":
             True,
 
         "tamanho":
             len(
-                texto
+                token
             ),
 
-        "parece_json":
-            parece_json,
+        "prefixo":
+            prefixo,
 
-        "parece_jwt":
-            parece_jwt
-    }
-
-
-# =========================================================
-# SANITIZAR HEADERS
-# =========================================================
-
-def analisar_headers_auth(
-    headers
-):
-
-    headers_lower = {
-        str(
-            chave
-        ).lower():
-            valor
-        for chave, valor
-        in headers.items()
-    }
-
-    authorization = headers_lower.get(
-        "authorization"
-    )
-
-    authorization_presente = bool(
-        authorization
-    )
-
-    authorization_tipo = None
-
-    if authorization_presente:
-
-        texto = str(
-            authorization
-        ).strip()
-
-        if " " in texto:
-
-            authorization_tipo = (
-                texto.split(
-                    " ",
-                    1
-                )[0]
-            )
-
-        else:
-
-            authorization_tipo = (
-                "TOKEN_SEM_PREFIXO"
-            )
-
-    headers_interessantes = []
-
-    for nome in headers_lower.keys():
-
-        if any(
-            palavra in nome
-            for palavra in [
-                "authorization",
-                "auth",
-                "token",
-                "api-key",
-                "apikey",
-                "x-api",
-                "client",
-                "session"
-            ]
-        ):
-
-            headers_interessantes.append(
-                nome
-            )
-
-    return {
-
-        "authorization_presente":
-            authorization_presente,
-
-        "authorization_tipo":
-            authorization_tipo,
-
-        "headers_auth_detectados":
-            sorted(
-                list(
-                    set(
-                        headers_interessantes
-                    )
-                )
-            )
+        "valor_exposto":
+            False
     }
 
 
@@ -1664,13 +1632,11 @@ def home():
 
                 "/status-sessao",
 
-                "/teste-sessao-http",
+                "/diagnostico-token",
 
-                "/diagnostico-storage",
+                "/teste-auth-http",
 
-                "/diagnostico-auth",
-
-                "/diagnostico-requisicoes-auth"
+                "/teste-endpoints-auth"
 
             ]
         }
@@ -1742,9 +1708,9 @@ def status_sessao():
                     SESSION_FILE
                 ),
 
-            "session_storage_existe":
-                os.path.exists(
-                    SESSION_STORAGE_FILE
+            "token_encontrado":
+                bool(
+                    obter_auth_token()
                 )
         }
     )
@@ -1766,15 +1732,13 @@ def gerar_sessao_route():
 
         resultado = gerar_sessao()
 
-        tempo = round(
+        resultado[
+            "tempo_segundos"
+        ] = round(
             time.time() -
             inicio,
             2
         )
-
-        resultado[
-            "tempo_segundos"
-        ] = tempo
 
         return jsonify(
             {
@@ -1803,261 +1767,14 @@ def gerar_sessao_route():
 
 
 # =========================================================
-# DIAGNÓSTICO STORAGE
+# DIAGNÓSTICO TOKEN
 # =========================================================
 
 @app.route(
-    "/diagnostico-storage",
+    "/diagnostico-token",
     methods=["GET"]
 )
-def diagnostico_storage():
-
-    try:
-
-        if not os.path.exists(
-            SESSION_FILE
-        ):
-
-            return jsonify(
-                {
-                    "status":
-                        "erro",
-
-                    "mensagem":
-                        (
-                            "Storage state ainda não existe. "
-                            "Execute /gerar-sessao primeiro."
-                        )
-                }
-            ), 400
-
-        with open(
-            SESSION_FILE,
-            "r",
-            encoding="utf-8"
-        ) as arquivo:
-
-            state = json.load(
-                arquivo
-            )
-
-        cookies_saida = []
-
-        for cookie in state.get(
-            "cookies",
-            []
-        ):
-
-            nome = cookie.get(
-                "name",
-                ""
-            )
-
-            cookies_saida.append(
-                {
-                    "nome":
-                        nome,
-
-                    "dominio":
-                        cookie.get(
-                            "domain"
-                        ),
-
-                    "path":
-                        cookie.get(
-                            "path"
-                        ),
-
-                    "http_only":
-                        cookie.get(
-                            "httpOnly"
-                        ),
-
-                    "secure":
-                        cookie.get(
-                            "secure"
-                        ),
-
-                    "suspeita_auth":
-                        parece_chave_auth(
-                            nome
-                        )
-                }
-            )
-
-        origins_saida = []
-
-        for origin in state.get(
-            "origins",
-            []
-        ):
-
-            storage_saida = []
-
-            for entrada in origin.get(
-                "localStorage",
-                []
-            ):
-
-                nome = entrada.get(
-                    "name",
-                    ""
-                )
-
-                valor = entrada.get(
-                    "value"
-                )
-
-                info = descrever_valor_seguro(
-                    valor
-                )
-
-                storage_saida.append(
-                    {
-                        "nome":
-                            nome,
-
-                        "suspeita_auth":
-                            parece_chave_auth(
-                                nome
-                            ),
-
-                        "tamanho_valor":
-                            info[
-                                "tamanho"
-                            ],
-
-                        "parece_json":
-                            info[
-                                "parece_json"
-                            ],
-
-                        "parece_jwt":
-                            info[
-                                "parece_jwt"
-                            ]
-                    }
-                )
-
-            origins_saida.append(
-                {
-                    "origin":
-                        origin.get(
-                            "origin"
-                        ),
-
-                    "local_storage":
-                        storage_saida
-                }
-            )
-
-        session_storage_saida = []
-
-        if os.path.exists(
-            SESSION_STORAGE_FILE
-        ):
-
-            try:
-
-                with open(
-                    SESSION_STORAGE_FILE,
-                    "r",
-                    encoding="utf-8"
-                ) as arquivo:
-
-                    ss = json.load(
-                        arquivo
-                    )
-
-                for nome, valor in ss.items():
-
-                    info = descrever_valor_seguro(
-                        valor
-                    )
-
-                    session_storage_saida.append(
-                        {
-                            "nome":
-                                nome,
-
-                            "suspeita_auth":
-                                parece_chave_auth(
-                                    nome
-                                ),
-
-                            "tamanho_valor":
-                                info[
-                                    "tamanho"
-                                ],
-
-                            "parece_json":
-                                info[
-                                    "parece_json"
-                                ],
-
-                            "parece_jwt":
-                                info[
-                                    "parece_jwt"
-                                ]
-                        }
-                    )
-
-            except Exception:
-
-                pass
-
-        return jsonify(
-            {
-                "status":
-                    "ok",
-
-                "cookies_quantidade":
-                    len(
-                        cookies_saida
-                    ),
-
-                "cookies":
-                    cookies_saida,
-
-                "origins":
-                    origins_saida,
-
-                "session_storage":
-                    session_storage_saida,
-
-                "seguranca":
-                    (
-                        "Valores sensíveis não são "
-                        "exibidos neste diagnóstico."
-                    )
-            }
-        )
-
-    except Exception as e:
-
-        return jsonify(
-            {
-                "status":
-                    "erro",
-
-                "erro":
-                    str(e),
-
-                "trace":
-                    traceback.format_exc()
-            }
-        ), 500
-
-
-# =========================================================
-# DIAGNÓSTICO AUTH
-# =========================================================
-
-@app.route(
-    "/diagnostico-auth",
-    methods=["GET"]
-)
-def diagnostico_auth():
+def diagnostico_token_route():
 
     try:
 
@@ -2069,177 +1786,101 @@ def diagnostico_auth():
                         "erro",
 
                     "mensagem":
-                        "Sessão não está válida."
+                        (
+                            "Sessão não está válida. "
+                            "Execute /gerar-sessao primeiro."
+                        )
                 }
             ), 400
-
-        candidatos = []
-
-        with open(
-            SESSION_FILE,
-            "r",
-            encoding="utf-8"
-        ) as arquivo:
-
-            state = json.load(
-                arquivo
-            )
-
-        for cookie in state.get(
-            "cookies",
-            []
-        ):
-
-            nome = cookie.get(
-                "name",
-                ""
-            )
-
-            if parece_chave_auth(
-                nome
-            ):
-
-                candidatos.append(
-                    {
-                        "origem":
-                            "cookie",
-
-                        "nome":
-                            nome,
-
-                        "dominio":
-                            cookie.get(
-                                "domain"
-                            )
-                    }
-                )
-
-        for origin in state.get(
-            "origins",
-            []
-        ):
-
-            for entrada in origin.get(
-                "localStorage",
-                []
-            ):
-
-                nome = entrada.get(
-                    "name",
-                    ""
-                )
-
-                valor = entrada.get(
-                    "value"
-                )
-
-                info = descrever_valor_seguro(
-                    valor
-                )
-
-                if (
-                    parece_chave_auth(
-                        nome
-                    )
-                    or info[
-                        "parece_jwt"
-                    ]
-                ):
-
-                    candidatos.append(
-                        {
-                            "origem":
-                                "localStorage",
-
-                            "origin":
-                                origin.get(
-                                    "origin"
-                                ),
-
-                            "nome":
-                                nome,
-
-                            "parece_jwt":
-                                info[
-                                    "parece_jwt"
-                                ],
-
-                            "tamanho_valor":
-                                info[
-                                    "tamanho"
-                                ]
-                        }
-                    )
-
-        if os.path.exists(
-            SESSION_STORAGE_FILE
-        ):
-
-            try:
-
-                with open(
-                    SESSION_STORAGE_FILE,
-                    "r",
-                    encoding="utf-8"
-                ) as arquivo:
-
-                    ss = json.load(
-                        arquivo
-                    )
-
-                for nome, valor in ss.items():
-
-                    info = descrever_valor_seguro(
-                        valor
-                    )
-
-                    if (
-                        parece_chave_auth(
-                            nome
-                        )
-                        or info[
-                            "parece_jwt"
-                        ]
-                    ):
-
-                        candidatos.append(
-                            {
-                                "origem":
-                                    "sessionStorage",
-
-                                "nome":
-                                    nome,
-
-                                "parece_jwt":
-                                    info[
-                                        "parece_jwt"
-                                    ],
-
-                                "tamanho_valor":
-                                    info[
-                                        "tamanho"
-                                    ]
-                            }
-                        )
-
-            except Exception:
-
-                pass
 
         return jsonify(
             {
                 "status":
                     "ok",
 
-                "quantidade_candidatos":
-                    len(
-                        candidatos
+                "auth":
+                    diagnosticar_token()
+            }
+        )
+
+    except Exception as e:
+
+        return jsonify(
+            {
+                "status":
+                    "erro",
+
+                "erro":
+                    str(e)
+            }
+        ), 500
+
+
+# =========================================================
+# TESTE HTTP COM AUTH
+# =========================================================
+
+@app.route(
+    "/teste-auth-http",
+    methods=["GET"]
+)
+def teste_auth_http():
+
+    try:
+
+        inicio = time.time()
+
+        garantia = garantir_sessao()
+
+        session = criar_requests_session(
+            incluir_auth=True
+        )
+
+        token = obter_auth_token()
+
+        # Página pública só serve para validar
+        # que a sessão HTTP está funcional.
+        resposta = session.get(
+            MATEUS_URL,
+            timeout=20,
+            allow_redirects=True
+        )
+
+        tempo = round(
+            time.time() -
+            inicio,
+            2
+        )
+
+        return jsonify(
+            {
+                "status":
+                    "ok",
+
+                "sessao":
+                    garantia,
+
+                "token_encontrado":
+                    bool(
+                        token
                     ),
 
-                "candidatos":
-                    candidatos,
+                "authorization_enviado":
+                    (
+                        "Authorization"
+                        in session.headers
+                    ),
 
-                "valores_expostos":
+                "http_status":
+                    resposta.status_code,
+
+                "url_final":
+                    resposta.url,
+
+                "tempo_segundos":
+                    tempo,
+
+                "token_exposto":
                     False
             }
         )
@@ -2261,14 +1902,14 @@ def diagnostico_auth():
 
 
 # =========================================================
-# DIAGNÓSTICO DE REQUISIÇÕES AUTENTICADAS
+# TESTAR ENDPOINTS AUTENTICADOS POSSÍVEIS
 # =========================================================
 
 @app.route(
-    "/diagnostico-requisicoes-auth",
+    "/teste-endpoints-auth",
     methods=["GET"]
 )
-def diagnostico_requisicoes_auth():
+def teste_endpoints_auth():
 
     try:
 
@@ -2287,304 +1928,151 @@ def diagnostico_requisicoes_auth():
                 }
             ), 400
 
-        capturas = []
+        inicio = time.time()
 
-        with sync_playwright() as p:
+        session = criar_requests_session(
+            incluir_auth=True
+        )
 
-            browser = criar_browser(
-                p
-            )
+        endpoints = [
 
-            context = browser.new_context(
-                storage_state=
-                    SESSION_FILE,
-
-                viewport={
-                    "width":
-                        1440,
-
-                    "height":
-                        900
-                },
-
-                locale=
-                    "pt-BR"
-            )
-
-            page = context.new_page()
-
-            def registrar_request(req):
-
-                try:
-
-                    if req.resource_type not in [
-                        "xhr",
-                        "fetch"
-                    ]:
-
-                        return
-
-                    try:
-
-                        headers = req.all_headers()
-
-                    except Exception:
-
-                        headers = req.headers
-
-                    analise = analisar_headers_auth(
-                        headers
-                    )
-
-                    url_lower = req.url.lower()
-
-                    endpoint_interessante = any(
-                        palavra in url_lower
-                        for palavra in [
-                            "user",
-                            "customer",
-                            "cliente",
-                            "profile",
-                            "account",
-                            "auth",
-                            "cart",
-                            "basket",
-                            "order",
-                            "checkout",
-                            "shipping",
-                            "address"
-                        ]
-                    )
-
-                    if (
-                        analise[
-                            "authorization_presente"
-                        ]
-                        or analise[
-                            "headers_auth_detectados"
-                        ]
-                        or endpoint_interessante
-                    ):
-
-                        capturas.append(
-                            {
-                                "metodo":
-                                    req.method,
-
-                                "url":
-                                    req.url,
-
-                                "resource_type":
-                                    req.resource_type,
-
-                                "authorization_presente":
-                                    analise[
-                                        "authorization_presente"
-                                    ],
-
-                                "authorization_tipo":
-                                    analise[
-                                        "authorization_tipo"
-                                    ],
-
-                                "headers_auth_detectados":
-                                    analise[
-                                        "headers_auth_detectados"
-                                    ]
-                            }
-                        )
-
-                except Exception:
-
-                    pass
-
-            page.on(
-                "request",
-                registrar_request
-            )
-
-            page.goto(
-                MATEUS_URL,
-                wait_until="domcontentloaded",
-                timeout=60000
-            )
-
-            page.wait_for_timeout(
-                5000
-            )
-
-            # Tenta abrir uma área tipicamente autenticada
-            seletores_conta = [
-
-                'a[href*="conta"]',
-
-                'a[href*="perfil"]',
-
-                'a[href*="pedido"]',
-
-                'button:has-text("Minha conta")',
-
-                'a:has-text("Minha conta")',
-
-                'button:has-text("Meus pedidos")',
-
-                'a:has-text("Meus pedidos")'
-
-            ]
-
-            clicou_area_conta = False
-
-            for seletor in seletores_conta:
-
-                try:
-
-                    elemento = page.locator(
-                        seletor
-                    ).first
-
-                    if elemento.is_visible(
-                        timeout=700
-                    ):
-
-                        elemento.click()
-
-                        clicou_area_conta = True
-
-                        page.wait_for_timeout(
-                            3000
-                        )
-
-                        break
-
-                except Exception:
-
-                    pass
-
-            url_final = page.url
-
-            browser.close()
-
-        # Remove duplicatas
-        unicas = []
-
-        vistos = set()
-
-        for captura in capturas:
-
-            chave = (
-                captura.get(
-                    "metodo"
-                ),
-                captura.get(
-                    "url"
-                ),
-                captura.get(
-                    "authorization_presente"
-                ),
-                captura.get(
-                    "authorization_tipo"
+            (
+                "user",
+                (
+                    MATEUS_APP_API +
+                    "/api/users"
                 )
-            )
+            ),
 
-            if chave in vistos:
+            (
+                "profile",
+                (
+                    MATEUS_APP_API +
+                    "/api/profile"
+                )
+            ),
 
-                continue
+            (
+                "customer",
+                (
+                    MATEUS_APP_API +
+                    "/api/customer"
+                )
+            ),
 
-            vistos.add(
-                chave
-            )
+            (
+                "customers",
+                (
+                    MATEUS_APP_API +
+                    "/api/customers"
+                )
+            ),
 
-            unicas.append(
-                captura
-            )
+            (
+                "account",
+                (
+                    MATEUS_APP_API +
+                    "/api/account"
+                )
+            ),
 
-        com_authorization = [
-            x
-            for x in unicas
-            if x.get(
-                "authorization_presente"
+            (
+                "me",
+                (
+                    MATEUS_APP_API +
+                    "/api/me"
+                )
+            ),
+
+            (
+                "cart",
+                (
+                    MATEUS_APP_API +
+                    "/api/cart"
+                )
+            ),
+
+            (
+                "carts",
+                (
+                    MATEUS_APP_API +
+                    "/api/carts"
+                )
+            ),
+
+            (
+                "checkout",
+                (
+                    MATEUS_APP_API +
+                    "/api/checkout"
+                )
             )
         ]
 
-        return jsonify(
-            {
-                "status":
-                    "ok",
+        resultados = []
 
-                "sessao_utilizada":
-                    True,
+        for nome, url in endpoints:
 
-                "clicou_area_conta":
-                    clicou_area_conta,
+            try:
 
-                "url_final":
-                    url_final,
+                resposta = session.get(
+                    url,
+                    timeout=8,
+                    allow_redirects=False
+                )
 
-                "quantidade_requisicoes":
-                    len(
-                        unicas
-                    ),
-
-                "quantidade_com_authorization":
-                    len(
-                        com_authorization
-                    ),
-
-                "autenticacao_detectada":
-                    len(
-                        com_authorization
-                    ) > 0,
-
-                "requisicoes":
-                    unicas[:50],
-
-                "seguranca":
-                    (
-                        "Nenhum token ou valor de "
-                        "autenticação foi exposto."
+                content_type = (
+                    resposta.headers.get(
+                        "content-type",
+                        ""
                     )
-            }
-        )
+                )
 
-    except Exception as e:
+                resultados.append(
+                    {
+                        "nome":
+                            nome,
 
-        return jsonify(
-            {
-                "status":
-                    "erro",
+                        "url":
+                            url,
 
-                "erro":
-                    str(e),
+                        "status":
+                            resposta.status_code,
 
-                "trace":
-                    traceback.format_exc()
-            }
-        ), 500
+                        "content_type":
+                            content_type,
 
+                        "autenticado_possivel":
+                            resposta.status_code
+                            not in [
+                                401,
+                                403
+                            ],
 
-# =========================================================
-# TESTAR SESSÃO VIA HTTP
-# =========================================================
+                        "tamanho_resposta":
+                            len(
+                                resposta.content
+                            )
+                    }
+                )
 
-@app.route(
-    "/teste-sessao-http",
-    methods=["GET"]
-)
-def teste_sessao_http():
+            except Exception as e:
 
-    try:
+                resultados.append(
+                    {
+                        "nome":
+                            nome,
 
-        inicio = time.time()
+                        "url":
+                            url,
 
-        garantia = garantir_sessao()
+                        "status":
+                            "ERRO",
 
-        session = criar_requests_session()
-
-        resposta = session.get(
-            MATEUS_URL,
-            timeout=30,
-            allow_redirects=True
-        )
+                        "erro":
+                            str(e)
+                    }
+                )
 
         tempo = round(
             time.time() -
@@ -2597,22 +2085,14 @@ def teste_sessao_http():
                 "status":
                     "ok",
 
-                "sessao":
-                    garantia,
-
-                "http_status":
-                    resposta.status_code,
-
-                "url_final":
-                    resposta.url,
+                "token":
+                    diagnosticar_token(),
 
                 "tempo_segundos":
                     tempo,
 
-                "cookies":
-                    len(
-                        session.cookies
-                    )
+                "resultados":
+                    resultados
             }
         )
 
