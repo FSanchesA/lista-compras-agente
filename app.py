@@ -154,7 +154,6 @@ def parse_preferencias(texto):
 
                 limite = None
 
-
             descricao = re.sub(
                 r"\s*at[eé]\s+R?\$?\s*[\d,.]+",
                 "",
@@ -165,7 +164,6 @@ def parse_preferencias(texto):
         else:
 
             descricao = parte.strip()
-
 
         preferencias.append(
             {
@@ -386,7 +384,6 @@ def normalizar_produto(produto):
 
         preco_por_medida = None
 
-
     return {
 
         "id":
@@ -596,7 +593,9 @@ def buscar_produtos_api(
             termo,
 
         "quantidade":
-            len(produtos),
+            len(
+                produtos
+            ),
 
         "produtos":
             produtos
@@ -640,7 +639,6 @@ def tamanho_compativel(
 
         return False
 
-
     valor = float(
         tamanho[
             "valor"
@@ -651,14 +649,12 @@ def tamanho_compativel(
         "tipo"
     ]
 
-
     if tipo == tipo_pref:
 
         return abs(
             medida -
             valor
         ) < 0.01
-
 
     if (
         tipo == "G"
@@ -670,7 +666,6 @@ def tamanho_compativel(
             valor * 1000
         ) < 1
 
-
     if (
         tipo == "KG"
         and tipo_pref == "G"
@@ -680,7 +675,6 @@ def tamanho_compativel(
             medida * 1000 -
             valor
         ) < 1
-
 
     if (
         tipo == "ML"
@@ -692,7 +686,6 @@ def tamanho_compativel(
             valor * 1000
         ) < 1
 
-
     if (
         tipo == "L"
         and tipo_pref == "ML"
@@ -702,7 +695,6 @@ def tamanho_compativel(
             medida * 1000 -
             valor
         ) < 1
-
 
     return False
 
@@ -755,7 +747,9 @@ def score_compatibilidade(
 
     return (
         acertos /
-        len(palavras)
+        len(
+            palavras
+        )
     )
 
 
@@ -844,7 +838,6 @@ def escolher_por_preferencia(
                         score
                 }
             )
-
 
         if candidatos:
 
@@ -935,6 +928,7 @@ def sugerir_alternativa(
     ]
 
     if not disponiveis:
+
         return None
 
     disponiveis.sort(
@@ -990,7 +984,6 @@ def decidir_item(
 
             return escolha
 
-
     sugestao = sugerir_alternativa(
         nome,
         produtos
@@ -1044,13 +1037,11 @@ def sessao_existe():
 
         return False
 
-
     if not os.path.exists(
         SESSION_META_FILE
     ):
 
         return False
-
 
     try:
 
@@ -1063,24 +1054,20 @@ def sessao_existe():
                 arquivo
             )
 
-
         criado = meta.get(
             "timestamp",
             0
         )
-
 
         idade = (
             time.time() -
             criado
         )
 
-
         return (
             idade <
             SESSION_MAX_AGE
         )
-
 
     except Exception:
 
@@ -1124,25 +1111,24 @@ def gerar_sessao():
             "não configuradas no Render."
         )
 
-
     with sync_playwright() as p:
 
         browser = criar_browser(
             p
         )
 
-
         context = browser.new_context(
             viewport={
-                "width": 1440,
-                "height": 900
+                "width":
+                    1440,
+
+                "height":
+                    900
             },
             locale="pt-BR"
         )
 
-
         page = context.new_page()
-
 
         page.goto(
             "https://mateusmais.com.br/login",
@@ -1150,33 +1136,58 @@ def gerar_sessao():
             timeout=60000
         )
 
+        # =================================================
+        # LOGIN
+        # =================================================
 
-        page.locator(
-    'input#login'
-).wait_for(
-    state="visible",
-    timeout=30000
-)
+        campo_login = page.locator(
+            'input#login'
+        )
 
+        campo_login.wait_for(
+            state="visible",
+            timeout=30000
+        )
 
-page.locator(
-    'input#login'
-).fill(
-    usuario
-)
+        campo_login.fill(
+            usuario
+        )
 
+        # =================================================
+        # SENHA
+        # =================================================
 
-page.locator(
-    'input#password'
-).fill(
-    senha
-)
+        campo_senha = page.locator(
+            'input#password'
+        )
 
+        campo_senha.wait_for(
+            state="visible",
+            timeout=30000
+        )
 
-        page.locator(
+        campo_senha.fill(
+            senha
+        )
+
+        # =================================================
+        # ENTRAR
+        # =================================================
+
+        botao_entrar = page.locator(
             'button[type="submit"]'
-        ).click()
+        )
 
+        botao_entrar.wait_for(
+            state="visible",
+            timeout=30000
+        )
+
+        botao_entrar.click()
+
+        # =================================================
+        # AGUARDAR SAÍDA DA PÁGINA DE LOGIN
+        # =================================================
 
         try:
 
@@ -1191,39 +1202,37 @@ page.locator(
 
             pass
 
-
         page.wait_for_timeout(
             2500
         )
 
-
         url_final = page.url
-
 
         if "/login" in url_final:
 
             browser.close()
 
             raise Exception(
-                "Login não foi concluído."
+                "Login não foi concluído. "
+                "O Mateus permaneceu na página de login."
             )
 
+        # =================================================
+        # SALVAR COOKIES + LOCAL STORAGE
+        # =================================================
 
         context.storage_state(
             path=SESSION_FILE
         )
 
-
         cookies = context.cookies()
-
 
         salvar_meta_sessao()
 
-
         browser.close()
 
-
     return {
+
         "status":
             "LOGIN_OK",
 
@@ -1231,7 +1240,9 @@ page.locator(
             True,
 
         "cookies_salvos":
-            len(cookies),
+            len(
+                cookies
+            ),
 
         "url":
             url_final
@@ -1254,9 +1265,7 @@ def garantir_sessao():
                 False
         }
 
-
     resultado = gerar_sessao()
-
 
     return {
         "status":
@@ -1279,7 +1288,6 @@ def criar_requests_session():
 
         gerar_sessao()
 
-
     with open(
         SESSION_FILE,
         "r"
@@ -1289,9 +1297,7 @@ def criar_requests_session():
             arquivo
         )
 
-
     session = requests.Session()
-
 
     session.headers.update(
         {
@@ -1312,7 +1318,6 @@ def criar_requests_session():
         }
     )
 
-
     for cookie in state.get(
         "cookies",
         []
@@ -1324,22 +1329,26 @@ def criar_requests_session():
                 cookie.get(
                     "name"
                 ),
+
                 cookie.get(
                     "value"
                 ),
-                domain=cookie.get(
-                    "domain"
-                ),
-                path=cookie.get(
-                    "path",
-                    "/"
-                )
+
+                domain=
+                    cookie.get(
+                        "domain"
+                    ),
+
+                path=
+                    cookie.get(
+                        "path",
+                        "/"
+                    )
             )
 
         except Exception:
 
             pass
-
 
     return session
 
@@ -1369,12 +1378,19 @@ def home():
                 sessao_existe(),
 
             "rotas": [
+
                 "/",
+
                 "/api-buscar?q=cafe",
+
                 "/executar-compra",
+
                 "/gerar-sessao",
+
                 "/status-sessao",
+
                 "/teste-sessao-http"
+
             ]
         }
     )
@@ -1392,9 +1408,7 @@ def status_sessao():
 
     existe = sessao_existe()
 
-
     idade = None
-
 
     if (
         existe
@@ -1414,7 +1428,6 @@ def status_sessao():
                     arquivo
                 )
 
-
             idade = round(
                 time.time() -
                 meta.get(
@@ -1427,7 +1440,6 @@ def status_sessao():
         except Exception:
 
             pass
-
 
     return jsonify(
         {
@@ -1460,9 +1472,7 @@ def gerar_sessao_route():
 
         inicio = time.time()
 
-
         resultado = gerar_sessao()
-
 
         tempo = round(
             time.time() -
@@ -1470,11 +1480,9 @@ def gerar_sessao_route():
             2
         )
 
-
         resultado[
             "tempo_segundos"
         ] = tempo
-
 
         return jsonify(
             {
@@ -1485,7 +1493,6 @@ def gerar_sessao_route():
                     resultado
             }
         )
-
 
     except Exception as e:
 
@@ -1517,12 +1524,9 @@ def teste_sessao_http():
 
         inicio = time.time()
 
-
         garantia = garantir_sessao()
 
-
         session = criar_requests_session()
-
 
         resposta = session.get(
             MATEUS_URL,
@@ -1530,13 +1534,11 @@ def teste_sessao_http():
             allow_redirects=True
         )
 
-
         tempo = round(
             time.time() -
             inicio,
             2
         )
-
 
         return jsonify(
             {
@@ -1561,7 +1563,6 @@ def teste_sessao_http():
                     )
             }
         )
-
 
     except Exception as e:
 
@@ -1594,14 +1595,12 @@ def api_buscar():
         "arroz"
     ).strip()
 
-
     try:
 
         resultado = buscar_produtos_api(
             termo,
             limite=50
         )
-
 
         return jsonify(
             {
@@ -1612,7 +1611,6 @@ def api_buscar():
                     resultado
             }
         )
-
 
     except Exception as e:
 
@@ -1643,12 +1641,10 @@ def executar_compra():
             force=True
         )
 
-
         itens = dados.get(
             "itens",
             []
         )
-
 
         if not itens:
 
@@ -1662,9 +1658,7 @@ def executar_compra():
                 }
             ), 400
 
-
         resultados = []
-
 
         for item in itens:
 
@@ -1675,18 +1669,15 @@ def executar_compra():
                 ).strip()
             )
 
-
             preferencias = item.get(
                 "preferencias",
                 ""
             )
 
-
             quantidade = item.get(
                 "quantidade",
                 "1"
             )
-
 
             try:
 
@@ -1695,16 +1686,13 @@ def executar_compra():
                     preferencias
                 )
 
-
                 resultado[
                     "quantidade"
                 ] = quantidade
 
-
                 resultados.append(
                     resultado
                 )
-
 
             except Exception as e:
 
@@ -1724,7 +1712,6 @@ def executar_compra():
                     }
                 )
 
-
         return jsonify(
             {
                 "status":
@@ -1742,7 +1729,6 @@ def executar_compra():
                     resultados
             }
         )
-
 
     except Exception as e:
 
@@ -1772,7 +1758,6 @@ if __name__ == "__main__":
             5000
         )
     )
-
 
     app.run(
         host="0.0.0.0",
