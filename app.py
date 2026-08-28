@@ -11,17 +11,11 @@ app = Flask(__name__)
 MATEUS_URL = "https://mateusmais.com.br/loja/supermercado-mateus-cohama"
 
 
-def parse_preferencias(texto):
-    """
-    Exemplo:
-    Santa Clara até 13; L'Or até 20
+# =========================================================
+# PREFERÊNCIAS
+# =========================================================
 
-    Retorna:
-    [
-        {"termo": "Santa Clara", "limite": 13.0},
-        {"termo": "L'Or", "limite": 20.0}
-    ]
-    """
+def parse_preferencias(texto):
 
     if not texto:
         return []
@@ -77,14 +71,11 @@ def parse_preferencias(texto):
     return preferencias
 
 
-def extrair_preco(texto):
-    """
-    Converte:
-    R$ 12,99
+# =========================================================
+# PREÇO
+# =========================================================
 
-    Para:
-    12.99
-    """
+def extrair_preco(texto):
 
     if not texto:
         return None
@@ -106,14 +97,16 @@ def extrair_preco(texto):
 
     try:
         return float(valor)
+
     except Exception:
         return None
 
 
+# =========================================================
+# NAVEGADOR
+# =========================================================
+
 def criar_browser(playwright):
-    """
-    Chromium configurado para o Render.
-    """
 
     return playwright.chromium.launch(
         headless=True,
@@ -127,9 +120,6 @@ def criar_browser(playwright):
 
 
 def criar_pagina(browser):
-    """
-    Cria uma página desktop.
-    """
 
     return browser.new_page(
         viewport={
@@ -140,10 +130,11 @@ def criar_pagina(browser):
     )
 
 
+# =========================================================
+# ABRIR MATEUS
+# =========================================================
+
 def abrir_mateus(page):
-    """
-    Abre a loja Mateus Cohama.
-    """
 
     page.goto(
         MATEUS_URL,
@@ -161,11 +152,11 @@ def abrir_mateus(page):
     }
 
 
+# =========================================================
+# LOGIN
+# =========================================================
+
 def login_mateus(page):
-    """
-    Login será implementado depois que
-    identificarmos os elementos reais do site.
-    """
 
     usuario = os.getenv(
         "MATEUS_LOGIN"
@@ -176,6 +167,7 @@ def login_mateus(page):
     )
 
     if not usuario or not senha:
+
         raise Exception(
             "Credenciais do Mateus não configuradas."
         )
@@ -185,60 +177,73 @@ def login_mateus(page):
     )
 
     return {
-        "status": "login_pendente_validacao"
+        "status":
+            "login_pendente_validacao"
     }
 
 
-def pesquisar_produto(
+# =========================================================
+# PESQUISA
+# =========================================================
+
+def executar_busca(
     page,
-    nome,
-    preferencias
+    termo
 ):
-    """
-    Estrutura da busca.
-    A pesquisa real será adicionada depois
-    do diagnóstico do campo de pesquisa.
-    """
 
-    resultado = {
-        "item": nome,
-        "status": "pendente",
-        "produto_encontrado": None,
-        "preco": None,
-        "mensagem": "",
-        "preferencias_interpretadas":
-            preferencias
+    abrir_mateus(
+        page
+    )
+
+
+    campo_busca = page.locator(
+        "#search-autocomplete-input"
+    )
+
+
+    campo_busca.wait_for(
+        state="visible",
+        timeout=30000
+    )
+
+
+    campo_busca.fill(
+        termo
+    )
+
+
+    page.wait_for_timeout(
+        800
+    )
+
+
+    campo_busca.press(
+        "Enter"
+    )
+
+
+    page.wait_for_timeout(
+        4000
+    )
+
+
+    return {
+
+        "termo":
+            termo,
+
+        "titulo":
+            page.title(),
+
+        "url":
+            page.url
+
     }
 
-    try:
 
-        abrir_mateus(
-            page
-        )
-
-        resultado["status"] = (
-            "site_aberto"
-        )
-
-        resultado["mensagem"] = (
-            "Mateus Mais abriu corretamente. "
-            f"Título da página: {page.title()}"
-        )
-
-        return resultado
-
-    except Exception as e:
-
-        resultado["status"] = (
-            "erro"
-        )
-
-        resultado["mensagem"] = (
-            str(e)
-        )
-
-        return resultado
-
+# =========================================================
+# HOME
+# =========================================================
 
 @app.route(
     "/",
@@ -248,6 +253,7 @@ def home():
 
     return jsonify(
         {
+
             "status":
                 "online",
 
@@ -261,11 +267,17 @@ def home():
                 "/",
                 "/teste",
                 "/diagnostico",
+                "/buscar?q=arroz",
                 "/executar-compra"
             ]
+
         }
     )
 
+
+# =========================================================
+# TESTE SIMPLES
+# =========================================================
 
 @app.route(
     "/teste",
@@ -291,8 +303,10 @@ def teste():
 
             browser.close()
 
+
         return jsonify(
             {
+
                 "status":
                     "ok",
 
@@ -301,13 +315,16 @@ def teste():
 
                 "url":
                     dados_site["url"]
+
             }
         )
+
 
     except Exception as e:
 
         return jsonify(
             {
+
                 "status":
                     "erro",
 
@@ -316,22 +333,20 @@ def teste():
 
                 "trace":
                     traceback.format_exc()
+
             }
         ), 500
 
+
+# =========================================================
+# DIAGNÓSTICO LEVE
+# =========================================================
 
 @app.route(
     "/diagnostico",
     methods=["GET"]
 )
 def diagnostico():
-    """
-    Diagnóstico leve.
-
-    Analisa somente os primeiros inputs
-    da página para identificar o campo
-    de pesquisa sem sobrecarregar o Render.
-    """
 
     try:
 
@@ -350,81 +365,78 @@ def diagnostico():
             )
 
             page.wait_for_timeout(
-                2000
+                1500
             )
 
+
             candidatos = []
+
 
             inputs = page.locator(
                 "input"
             )
 
+
             total = inputs.count()
 
-            limite = min(
-                total,
-                20
-            )
 
             for i in range(
-                limite
+                min(
+                    total,
+                    20
+                )
             ):
 
                 el = inputs.nth(
                     i
                 )
 
-                try:
+                candidatos.append(
+                    {
 
-                    candidatos.append(
-                        {
-                            "indice":
-                                i,
+                        "indice":
+                            i,
 
-                            "placeholder":
-                                el.get_attribute(
-                                    "placeholder"
-                                ) or "",
+                        "placeholder":
+                            el.get_attribute(
+                                "placeholder"
+                            ) or "",
 
-                            "name":
-                                el.get_attribute(
-                                    "name"
-                                ) or "",
+                        "name":
+                            el.get_attribute(
+                                "name"
+                            ) or "",
 
-                            "type":
-                                el.get_attribute(
-                                    "type"
-                                ) or "",
+                        "type":
+                            el.get_attribute(
+                                "type"
+                            ) or "",
 
-                            "id":
-                                el.get_attribute(
-                                    "id"
-                                ) or "",
+                        "id":
+                            el.get_attribute(
+                                "id"
+                            ) or "",
 
-                            "aria_label":
-                                el.get_attribute(
-                                    "aria-label"
-                                ) or "",
+                        "aria_label":
+                            el.get_attribute(
+                                "aria-label"
+                            ) or ""
 
-                            "autocomplete":
-                                el.get_attribute(
-                                    "autocomplete"
-                                ) or ""
-                        }
-                    )
+                    }
+                )
 
-                except Exception:
-
-                    pass
 
             titulo = page.title()
 
             url = page.url
 
+
             browser.close()
+
 
         return jsonify(
             {
+
                 "status":
                     "ok",
 
@@ -439,13 +451,16 @@ def diagnostico():
 
                 "inputs":
                     candidatos
+
             }
         )
+
 
     except Exception as e:
 
         return jsonify(
             {
+
                 "status":
                     "erro",
 
@@ -454,9 +469,273 @@ def diagnostico():
 
                 "trace":
                     traceback.format_exc()
+
             }
         ), 500
 
+
+# =========================================================
+# BUSCA REAL
+# =========================================================
+
+@app.route(
+    "/buscar",
+    methods=["GET"]
+)
+def buscar():
+
+    termo = request.args.get(
+        "q",
+        "arroz"
+    ).strip()
+
+
+    if not termo:
+
+        return jsonify(
+            {
+
+                "status":
+                    "erro",
+
+                "mensagem":
+                    "Informe um produto para pesquisar."
+
+            }
+        ), 400
+
+
+    try:
+
+        with sync_playwright() as p:
+
+            browser = criar_browser(
+                p
+            )
+
+            page = criar_pagina(
+                browser
+            )
+
+
+            resultado = executar_busca(
+                page,
+                termo
+            )
+
+
+            # -------------------------------------------------
+            # TENTAMOS IDENTIFICAR LINKS DE PRODUTOS
+            # SEM VARRER A PÁGINA INTEIRA
+            # -------------------------------------------------
+
+            produtos = []
+
+
+            seletores = [
+
+                'a[href*="/produto"]',
+
+                'a[href*="/product"]',
+
+                'a[href*="/p"]'
+
+            ]
+
+
+            for seletor in seletores:
+
+                links = page.locator(
+                    seletor
+                )
+
+                quantidade = min(
+                    links.count(),
+                    20
+                )
+
+
+                for i in range(
+                    quantidade
+                ):
+
+                    link = links.nth(
+                        i
+                    )
+
+                    try:
+
+                        texto = (
+                            link
+                            .inner_text(
+                                timeout=2000
+                            )
+                            .strip()
+                        )
+
+
+                        href = (
+                            link.get_attribute(
+                                "href"
+                            ) or ""
+                        )
+
+
+                        if (
+                            texto or
+                            href
+                        ):
+
+                            registro = {
+
+                                "texto":
+                                    texto[:500],
+
+                                "href":
+                                    href
+
+                            }
+
+
+                            if (
+                                registro not in
+                                produtos
+                            ):
+
+                                produtos.append(
+                                    registro
+                                )
+
+                    except Exception:
+
+                        pass
+
+
+                if produtos:
+
+                    break
+
+
+            resultado[
+                "quantidade_produtos_detectados"
+            ] = len(
+                produtos
+            )
+
+
+            resultado[
+                "produtos"
+            ] = produtos[:20]
+
+
+            browser.close()
+
+
+        return jsonify(
+            {
+
+                "status":
+                    "ok",
+
+                "resultado":
+                    resultado
+
+            }
+        )
+
+
+    except Exception as e:
+
+        return jsonify(
+            {
+
+                "status":
+                    "erro",
+
+                "erro":
+                    str(e),
+
+                "trace":
+                    traceback.format_exc()
+
+            }
+        ), 500
+
+
+# =========================================================
+# PESQUISAR PRODUTO PARA COMPRA
+# =========================================================
+
+def pesquisar_produto(
+    page,
+    nome,
+    preferencias
+):
+
+    resultado = {
+
+        "item":
+            nome,
+
+        "status":
+            "pendente",
+
+        "produto_encontrado":
+            None,
+
+        "preco":
+            None,
+
+        "preferencias_interpretadas":
+            preferencias
+
+    }
+
+
+    try:
+
+        dados_busca = executar_busca(
+            page,
+            nome
+        )
+
+
+        resultado["status"] = (
+            "busca_executada"
+        )
+
+
+        resultado["url"] = (
+            dados_busca["url"]
+        )
+
+
+        resultado["titulo"] = (
+            dados_busca["titulo"]
+        )
+
+
+        return resultado
+
+
+    except Exception as e:
+
+        resultado["status"] = (
+            "erro"
+        )
+
+
+        resultado["mensagem"] = (
+            str(e)
+        )
+
+
+        return resultado
+
+
+# =========================================================
+# EXECUTAR COMPRA
+# =========================================================
 
 @app.route(
     "/executar-compra",
@@ -470,20 +749,24 @@ def executar_compra():
             force=True
         )
 
+
         itens = dados.get(
             "itens",
             []
         )
 
+
         if not itens:
 
             return jsonify(
                 {
+
                     "status":
                         "erro",
 
                     "mensagem":
                         "Nenhum item recebido."
+
                 }
             ), 400
 
@@ -496,6 +779,7 @@ def executar_compra():
             browser = criar_browser(
                 p
             )
+
 
             page = criar_pagina(
                 browser
@@ -524,12 +808,10 @@ def executar_compra():
                 )
 
 
-                resultado = (
-                    pesquisar_produto(
-                        page,
-                        nome,
-                        preferencias
-                    )
+                resultado = pesquisar_produto(
+                    page,
+                    nome,
+                    preferencias
                 )
 
 
@@ -537,14 +819,6 @@ def executar_compra():
                     item.get(
                         "quantidade",
                         "1"
-                    )
-                )
-
-
-                resultado["observacao"] = (
-                    item.get(
-                        "observacao",
-                        ""
                     )
                 )
 
@@ -559,6 +833,7 @@ def executar_compra():
 
         return jsonify(
             {
+
                 "status":
                     "ok",
 
@@ -572,6 +847,7 @@ def executar_compra():
 
                 "resultados":
                     resultados
+
             }
         )
 
@@ -580,6 +856,7 @@ def executar_compra():
 
         return jsonify(
             {
+
                 "status":
                     "erro",
 
@@ -588,9 +865,14 @@ def executar_compra():
 
                 "trace":
                     traceback.format_exc()
+
             }
         ), 500
 
+
+# =========================================================
+# INICIAR APP
+# =========================================================
 
 if __name__ == "__main__":
 
@@ -600,6 +882,7 @@ if __name__ == "__main__":
             5000
         )
     )
+
 
     app.run(
         host="0.0.0.0",
