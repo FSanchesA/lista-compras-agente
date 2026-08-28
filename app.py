@@ -23,9 +23,7 @@ MATEUS_URL = (
     "loja/supermercado-mateus-cohama"
 )
 
-MATEUS_BASE = (
-    "https://mateusmais.com.br"
-)
+MATEUS_BASE = "https://mateusmais.com.br"
 
 MATEUS_APP_API = (
     "https://app.mateusmais.com.br"
@@ -93,7 +91,6 @@ def normalizar_texto(texto):
     }
 
     for origem, destino in substituicoes.items():
-
         texto = texto.replace(
             origem,
             destino
@@ -154,13 +151,9 @@ def parse_preferencias(texto):
             )
 
             try:
-
-                limite = float(
-                    valor
-                )
+                limite = float(valor)
 
             except Exception:
-
                 limite = None
 
             descricao = re.sub(
@@ -171,19 +164,13 @@ def parse_preferencias(texto):
             ).strip()
 
         else:
-
             descricao = parte.strip()
 
         preferencias.append(
             {
-                "prioridade":
-                    indice,
-
-                "descricao":
-                    descricao,
-
-                "limite":
-                    limite
+                "prioridade": indice,
+                "descricao": descricao,
+                "limite": limite
             }
         )
 
@@ -204,22 +191,18 @@ def extrair_tamanho(texto):
     )
 
     padroes = [
-
         (
             r"(\d+(?:[.,]\d+)?)\s*kg",
             "KG"
         ),
-
         (
             r"(\d+(?:[.,]\d+)?)\s*g",
             "G"
         ),
-
         (
             r"(\d+(?:[.,]\d+)?)\s*l",
             "L"
         ),
-
         (
             r"(\d+(?:[.,]\d+)?)\s*ml",
             "ML"
@@ -233,27 +216,24 @@ def extrair_tamanho(texto):
             texto_norm
         )
 
-        if match:
+        if not match:
+            continue
 
-            valor = (
-                match
-                .group(1)
-                .replace(",", ".")
-            )
+        valor = (
+            match
+            .group(1)
+            .replace(",", ".")
+        )
 
-            try:
+        try:
 
-                return {
-                    "valor":
-                        float(valor),
+            return {
+                "valor": float(valor),
+                "tipo": tipo
+            }
 
-                    "tipo":
-                        tipo
-                }
-
-            except Exception:
-
-                return None
+        except Exception:
+            return None
 
     return None
 
@@ -280,28 +260,57 @@ def remover_tamanho(texto):
 
 
 # =========================================================
+# IDENTIFICADOR DO PRODUTO
+# =========================================================
+
+def extrair_produto_id(produto):
+
+    if not isinstance(
+        produto,
+        dict
+    ):
+        return None
+
+    candidatos = [
+        "id",
+        "objectID",
+        "objectId",
+        "product_id",
+        "productId",
+        "product_uuid",
+        "uuid"
+    ]
+
+    for campo in candidatos:
+
+        valor = produto.get(
+            campo
+        )
+
+        if valor not in [
+            None,
+            "",
+            "None"
+        ]:
+
+            return str(
+                valor
+            )
+
+    return None
+
+
+# =========================================================
 # PREÇO
 # =========================================================
 
 def preco_efetivo(produto):
 
     candidatos = [
-
-        produto.get(
-            "sale_price"
-        ),
-
-        produto.get(
-            "low_price"
-        ),
-
-        produto.get(
-            "bulk_price"
-        ),
-
-        produto.get(
-            "price"
-        )
+        produto.get("sale_price"),
+        produto.get("low_price"),
+        produto.get("bulk_price"),
+        produto.get("price")
     ]
 
     for valor in candidatos:
@@ -313,10 +322,7 @@ def preco_efetivo(produto):
             )
             and valor > 0
         ):
-
-            return float(
-                valor
-            )
+            return float(valor)
 
     return None
 
@@ -337,6 +343,10 @@ def normalizar_produto(produto):
 
     tipo_medida = produto.get(
         "measure_type"
+    )
+
+    produto_id = extrair_produto_id(
+        produto
     )
 
     preco_por_medida = None
@@ -388,15 +398,12 @@ def normalizar_produto(produto):
                 )
 
     except Exception:
-
         preco_por_medida = None
 
     return {
 
         "id":
-            produto.get(
-                "id"
-            ),
+            produto_id,
 
         "sku":
             produto.get(
@@ -411,11 +418,15 @@ def normalizar_produto(produto):
         "nome":
             produto.get(
                 "name"
+            ) or produto.get(
+                "nome"
             ),
 
         "marca":
             produto.get(
                 "brand"
+            ) or produto.get(
+                "marca"
             ),
 
         "categoria":
@@ -478,11 +489,42 @@ def normalizar_produto(produto):
             ),
 
         "imagem":
-            produto.get(
-                "small_image"
-            ) or produto.get(
-                "image"
-            )
+            (
+                produto.get(
+                    "small_image"
+                )
+                or produto.get(
+                    "image"
+                )
+            ),
+
+        "campos_id_disponiveis":
+            {
+                "id":
+                    produto.get(
+                        "id"
+                    ),
+
+                "objectID":
+                    produto.get(
+                        "objectID"
+                    ),
+
+                "objectId":
+                    produto.get(
+                        "objectId"
+                    ),
+
+                "product_id":
+                    produto.get(
+                        "product_id"
+                    ),
+
+                "productId":
+                    produto.get(
+                        "productId"
+                    )
+            }
     }
 
 
@@ -497,11 +539,9 @@ def buscar_produtos_api(
 ):
 
     facet_filters = [
-
         [
             f"market_id:{MARKET_ID}"
         ],
-
         [
             "for_sale:true"
         ]
@@ -509,14 +549,9 @@ def buscar_produtos_api(
 
     params_busca = urlencode(
         {
-            "page":
-                pagina,
-
-            "hitsPerPage":
-                limite,
-
-            "clickAnalytics":
-                "true",
+            "page": pagina,
+            "hitsPerPage": limite,
+            "clickAnalytics": "true",
 
             "facetFilters":
                 json.dumps(
@@ -527,8 +562,7 @@ def buscar_produtos_api(
                     )
                 ),
 
-            "query":
-                termo
+            "query": termo
         }
     )
 
@@ -598,17 +632,9 @@ def buscar_produtos_api(
     ]
 
     return {
-
-        "termo":
-            termo,
-
-        "quantidade":
-            len(
-                produtos
-            ),
-
-        "produtos":
-            produtos
+        "termo": termo,
+        "quantidade": len(produtos),
+        "produtos": produtos
     }
 
 
@@ -622,7 +648,6 @@ def tamanho_compativel(
 ):
 
     if not tamanho:
-
         return True
 
     medida = produto.get(
@@ -637,23 +662,16 @@ def tamanho_compativel(
         medida is None
         or tipo is None
     ):
-
         return False
 
     try:
-
-        medida = float(
-            medida
-        )
+        medida = float(medida)
 
     except Exception:
-
         return False
 
     valor = float(
-        tamanho[
-            "valor"
-        ]
+        tamanho["valor"]
     )
 
     tipo_pref = tamanho[
@@ -728,7 +746,6 @@ def score_compatibilidade(
     ]
 
     if not palavras:
-
         return 0
 
     texto_produto = normalizar_texto(
@@ -759,9 +776,7 @@ def score_compatibilidade(
 
     return (
         acertos /
-        len(
-            palavras
-        )
+        len(palavras)
     )
 
 
@@ -802,7 +817,6 @@ def escolher_por_preferencia(
                 "for_sale",
                 True
             ):
-
                 continue
 
             estoque = produto.get(
@@ -813,14 +827,12 @@ def escolher_por_preferencia(
                 estoque is not None
                 and estoque <= 0
             ):
-
                 continue
 
             if not tamanho_compativel(
                 produto,
                 tamanho
             ):
-
                 continue
 
             preco = produto.get(
@@ -828,14 +840,12 @@ def escolher_por_preferencia(
             )
 
             if preco is None:
-
                 continue
 
             if (
                 limite is not None
                 and preco > limite
             ):
-
                 continue
 
             score = score_compatibilidade(
@@ -844,25 +854,19 @@ def escolher_por_preferencia(
             )
 
             if score <= 0:
-
                 continue
 
             candidatos.append(
                 {
-                    "produto":
-                        produto,
-
-                    "score":
-                        score
+                    "produto": produto,
+                    "score": score
                 }
             )
 
         if candidatos:
 
             melhor_score = max(
-                x[
-                    "score"
-                ]
+                x["score"]
                 for x in candidatos
             )
 
@@ -870,18 +874,14 @@ def escolher_por_preferencia(
                 x
                 for x in candidatos
                 if abs(
-                    x[
-                        "score"
-                    ] -
+                    x["score"] -
                     melhor_score
                 ) < 0.0001
             ]
 
             melhores.sort(
                 key=lambda x:
-                    x[
-                        "produto"
-                    ].get(
+                    x["produto"].get(
                         "preco_efetivo"
                     )
                     or 999999
@@ -926,7 +926,7 @@ def escolher_por_preferencia(
 
 
 # =========================================================
-# SUGESTÃO MELHOR CUSTO
+# SUGESTÃO
 # =========================================================
 
 def sugerir_alternativa(
@@ -957,7 +957,6 @@ def sugerir_alternativa(
     ]
 
     if not disponiveis:
-
         return None
 
     disponiveis.sort(
@@ -977,9 +976,7 @@ def sugerir_alternativa(
         )
     )
 
-    return disponiveis[
-        0
-    ]
+    return disponiveis[0]
 
 
 # =========================================================
@@ -1014,7 +1011,6 @@ def decidir_item(
         )
 
         if escolha:
-
             return escolha
 
     sugestao = sugerir_alternativa(
@@ -1068,13 +1064,11 @@ def sessao_existe():
     if not os.path.exists(
         SESSION_FILE
     ):
-
         return False
 
     if not os.path.exists(
         SESSION_META_FILE
     ):
-
         return False
 
     try:
@@ -1105,7 +1099,6 @@ def sessao_existe():
         )
 
     except Exception:
-
         return False
 
 
@@ -1127,7 +1120,7 @@ def salvar_meta_sessao():
 
 
 # =========================================================
-# CAPTURAR SESSION STORAGE
+# SESSION STORAGE
 # =========================================================
 
 def capturar_session_storage(
@@ -1171,12 +1164,9 @@ def capturar_session_storage(
                 ensure_ascii=False
             )
 
-        return len(
-            dados
-        )
+        return len(dados)
 
     except Exception:
-
         return 0
 
 
@@ -1209,11 +1199,8 @@ def gerar_sessao():
 
         context = browser.new_context(
             viewport={
-                "width":
-                    1440,
-
-                "height":
-                    900
+                "width": 1440,
+                "height": 900
             },
             locale="pt-BR"
         )
@@ -1273,7 +1260,6 @@ def gerar_sessao():
             )
 
         except Exception:
-
             pass
 
         page.wait_for_timeout(
@@ -1315,9 +1301,7 @@ def gerar_sessao():
             True,
 
         "cookies_salvos":
-            len(
-                cookies
-            ),
+            len(cookies),
 
         "session_storage_salvos":
             session_storage_qtd,
@@ -1336,7 +1320,6 @@ def ler_storage_state():
     if not os.path.exists(
         SESSION_FILE
     ):
-
         return None
 
     with open(
@@ -1350,10 +1333,6 @@ def ler_storage_state():
         )
 
 
-# =========================================================
-# LOCAL STORAGE
-# =========================================================
-
 def obter_local_storage(
     chave_procurada
 ):
@@ -1361,7 +1340,6 @@ def obter_local_storage(
     state = ler_storage_state()
 
     if not state:
-
         return None
 
     for origin in state.get(
@@ -1396,7 +1374,6 @@ def obter_auth_token():
     )
 
     if not valor:
-
         return None
 
     try:
@@ -1409,7 +1386,6 @@ def obter_auth_token():
             parsed,
             str
         ):
-
             return parsed
 
         if isinstance(
@@ -1429,13 +1405,10 @@ def obter_auth_token():
                 ):
 
                     return str(
-                        parsed[
-                            chave
-                        ]
+                        parsed[chave]
                     )
 
     except Exception:
-
         pass
 
     return str(
@@ -1454,7 +1427,6 @@ def garantir_sessao():
     if sessao_existe():
 
         return {
-
             "status":
                 "SESSAO_REUTILIZADA",
 
@@ -1465,11 +1437,8 @@ def garantir_sessao():
     resultado = gerar_sessao()
 
     return {
-
         "status":
-            resultado[
-                "status"
-            ],
+            resultado["status"],
 
         "nova":
             True
@@ -1477,7 +1446,7 @@ def garantir_sessao():
 
 
 # =========================================================
-# SESSION HTTP AUTENTICADA
+# HTTP AUTH
 # =========================================================
 
 def criar_requests_session(
@@ -1517,11 +1486,6 @@ def criar_requests_session(
 
         if token:
 
-            # =============================================
-            # PADRÃO REAL IDENTIFICADO NO MATEUS
-            # Authorization: token <TOKEN>
-            # =============================================
-
             session.headers.update(
                 {
                     "Authorization":
@@ -1536,47 +1500,7 @@ def criar_requests_session(
 
 
 # =========================================================
-# DIAGNÓSTICO TOKEN
-# =========================================================
-
-def diagnosticar_token():
-
-    token = obter_auth_token()
-
-    if not token:
-
-        return {
-
-            "token_encontrado":
-                False,
-
-            "tamanho":
-                0,
-
-            "valor_exposto":
-                False
-        }
-
-    return {
-
-        "token_encontrado":
-            True,
-
-        "tamanho":
-            len(
-                token
-            ),
-
-        "authorization":
-            "token <oculto>",
-
-        "valor_exposto":
-            False
-    }
-
-
-# =========================================================
-# ADICIONAR PRODUTO AO CARRINHO VIA API
+# ADICIONAR AO CARRINHO
 # =========================================================
 
 def adicionar_produto_carrinho(
@@ -1584,20 +1508,33 @@ def adicionar_produto_carrinho(
     quantidade=1
 ):
 
-    if not produto:
+    if not isinstance(
+        produto,
+        dict
+    ):
 
         raise Exception(
-            "Produto não informado."
+            "Produto inválido."
         )
 
-    produto_id = produto.get(
-        "id"
+    produto_id = extrair_produto_id(
+        produto
     )
 
     if not produto_id:
 
         raise Exception(
-            "Produto sem ID válido."
+            (
+                "Produto sem ID válido. "
+                "Campos encontrados: "
+                +
+                json.dumps(
+                    list(
+                        produto.keys()
+                    ),
+                    ensure_ascii=False
+                )
+            )
         )
 
     try:
@@ -1607,7 +1544,6 @@ def adicionar_produto_carrinho(
         )
 
     except Exception:
-
         quantidade = 1
 
     quantidade = max(
@@ -1662,6 +1598,8 @@ def adicionar_produto_carrinho(
 
     dados_resposta = None
 
+    texto_resposta = None
+
     try:
 
         dados_resposta = (
@@ -1670,7 +1608,11 @@ def adicionar_produto_carrinho(
 
     except Exception:
 
-        pass
+        texto_resposta = (
+            resposta.text[
+                :1000
+            ]
+        )
 
     return {
 
@@ -1687,12 +1629,32 @@ def adicionar_produto_carrinho(
         "tempo_segundos":
             tempo,
 
+        "produto_id_detectado":
+            produto_id,
+
+        "payload_enviado":
+            {
+                "products": [
+                    {
+                        "id":
+                            produto_id,
+
+                        "quantity":
+                            quantidade,
+
+                        "market_id":
+                            MARKET_ID
+                    }
+                ],
+
+                "price_table":
+                    "00"
+            },
+
         "produto":
             {
                 "id":
-                    produto.get(
-                        "id"
-                    ),
+                    produto_id,
 
                 "sku":
                     produto.get(
@@ -1720,6 +1682,9 @@ def adicionar_produto_carrinho(
 
         "resposta":
             dados_resposta,
+
+        "resposta_texto":
+            texto_resposta,
 
         "token_exposto":
             False
@@ -1751,23 +1716,13 @@ def home():
                 sessao_existe(),
 
             "rotas": [
-
                 "/",
-
                 "/api-buscar?q=cafe",
-
-                "/executar-compra",
-
+                "/debug-produto?item=cafe",
                 "/gerar-sessao",
-
                 "/status-sessao",
-
-                "/diagnostico-token",
-
-                "/teste-auth-http",
-
-                "/teste-adicionar-carrinho?item=cafe&quantidade=1"
-
+                "/teste-adicionar-carrinho?item=cafe&quantidade=1",
+                "/executar-compra"
             ]
         }
     )
@@ -1785,40 +1740,6 @@ def status_sessao():
 
     existe = sessao_existe()
 
-    idade = None
-
-    if (
-        existe
-        and os.path.exists(
-            SESSION_META_FILE
-        )
-    ):
-
-        try:
-
-            with open(
-                SESSION_META_FILE,
-                "r",
-                encoding="utf-8"
-            ) as arquivo:
-
-                meta = json.load(
-                    arquivo
-                )
-
-            idade = round(
-                time.time() -
-                meta.get(
-                    "timestamp",
-                    time.time()
-                ),
-                1
-            )
-
-        except Exception:
-
-            pass
-
     return jsonify(
         {
             "status":
@@ -1826,12 +1747,6 @@ def status_sessao():
 
             "sessao_valida":
                 existe,
-
-            "idade_segundos":
-                idade,
-
-            "validade_maxima_segundos":
-                SESSION_MAX_AGE,
 
             "storage_state_existe":
                 os.path.exists(
@@ -1897,85 +1812,25 @@ def gerar_sessao_route():
 
 
 # =========================================================
-# DIAGNÓSTICO TOKEN
+# DEBUG PRODUTO
 # =========================================================
 
 @app.route(
-    "/diagnostico-token",
+    "/debug-produto",
     methods=["GET"]
 )
-def diagnostico_token_route():
+def debug_produto():
 
     try:
 
-        if not sessao_existe():
+        item = request.args.get(
+            "item",
+            "cafe"
+        ).strip()
 
-            return jsonify(
-                {
-                    "status":
-                        "erro",
-
-                    "mensagem":
-                        (
-                            "Sessão não está válida. "
-                            "Execute /gerar-sessao primeiro."
-                        )
-                }
-            ), 400
-
-        return jsonify(
-            {
-                "status":
-                    "ok",
-
-                "auth":
-                    diagnosticar_token()
-            }
-        )
-
-    except Exception as e:
-
-        return jsonify(
-            {
-                "status":
-                    "erro",
-
-                "erro":
-                    str(e)
-            }
-        ), 500
-
-
-# =========================================================
-# TESTE HTTP AUTH
-# =========================================================
-
-@app.route(
-    "/teste-auth-http",
-    methods=["GET"]
-)
-def teste_auth_http():
-
-    try:
-
-        inicio = time.time()
-
-        garantia = garantir_sessao()
-
-        session = criar_requests_session(
-            incluir_auth=True
-        )
-
-        resposta = session.get(
-            MATEUS_URL,
-            timeout=20,
-            allow_redirects=True
-        )
-
-        tempo = round(
-            time.time() -
-            inicio,
-            2
+        busca = buscar_produtos_api(
+            item,
+            limite=5
         )
 
         return jsonify(
@@ -1983,25 +1838,14 @@ def teste_auth_http():
                 "status":
                     "ok",
 
-                "sessao":
-                    garantia,
+                "item":
+                    item,
 
-                "token_encontrado":
-                    bool(
-                        obter_auth_token()
-                    ),
-
-                "authorization_formato":
-                    "token <oculto>",
-
-                "http_status":
-                    resposta.status_code,
-
-                "tempo_segundos":
-                    tempo,
-
-                "token_exposto":
-                    False
+                "produtos":
+                    busca.get(
+                        "produtos",
+                        []
+                    )
             }
         )
 
@@ -2022,7 +1866,7 @@ def teste_auth_http():
 
 
 # =========================================================
-# TESTE ADICIONAR 1 PRODUTO AO CARRINHO
+# TESTE ADICIONAR
 # =========================================================
 
 @app.route(
@@ -2053,7 +1897,6 @@ def teste_adicionar_carrinho():
             )
 
         except Exception:
-
             quantidade = 1
 
         quantidade = max(
@@ -2061,15 +1904,7 @@ def teste_adicionar_carrinho():
             1
         )
 
-        # -------------------------------------------------
-        # GARANTIR LOGIN / TOKEN
-        # -------------------------------------------------
-
         sessao = garantir_sessao()
-
-        # -------------------------------------------------
-        # ESCOLHER PRODUTO
-        # -------------------------------------------------
 
         decisao = decidir_item(
             item,
@@ -2107,9 +1942,34 @@ def teste_adicionar_carrinho():
                 }
             ), 404
 
-        # -------------------------------------------------
-        # ADICIONAR AO CARRINHO
-        # -------------------------------------------------
+        produto_id = extrair_produto_id(
+            produto
+        )
+
+        if not produto_id:
+
+            return jsonify(
+                {
+                    "status":
+                        "erro",
+
+                    "mensagem":
+                        "Produto escolhido sem ID.",
+
+                    "produto":
+                        produto,
+
+                    "campos":
+                        list(
+                            produto.keys()
+                        ),
+
+                    "decisao_status":
+                        decisao.get(
+                            "status"
+                        )
+                }
+            ), 400
 
         resultado_carrinho = (
             adicionar_produto_carrinho(
@@ -2134,6 +1994,9 @@ def teste_adicionar_carrinho():
 
                 "item_solicitado":
                     item,
+
+                "produto_id_detectado":
+                    produto_id,
 
                 "decisao":
                     {
@@ -2226,7 +2089,7 @@ def api_buscar():
 
 
 # =========================================================
-# EXECUTAR COMPRA - SOMENTE ANÁLISE POR ENQUANTO
+# EXECUTAR COMPRA - ANÁLISE
 # =========================================================
 
 @app.route(
