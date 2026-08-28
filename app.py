@@ -49,7 +49,6 @@ def parse_preferencias(texto):
 
             try:
                 limite = float(limite)
-
             except Exception:
                 limite = None
 
@@ -98,7 +97,6 @@ def extrair_preco(texto):
 
     try:
         return float(valor)
-
     except Exception:
         return None
 
@@ -154,37 +152,7 @@ def abrir_mateus(page):
 
 
 # =========================================================
-# LOGIN
-# =========================================================
-
-def login_mateus(page):
-
-    usuario = os.getenv(
-        "MATEUS_LOGIN"
-    )
-
-    senha = os.getenv(
-        "MATEUS_SENHA"
-    )
-
-    if not usuario or not senha:
-
-        raise Exception(
-            "Credenciais do Mateus não configuradas."
-        )
-
-    abrir_mateus(
-        page
-    )
-
-    return {
-        "status":
-            "login_pendente_validacao"
-    }
-
-
-# =========================================================
-# PESQUISA
+# PESQUISA VISUAL
 # =========================================================
 
 def executar_busca(
@@ -222,19 +190,14 @@ def executar_busca(
     )
 
     return {
-        "termo":
-            termo,
-
-        "titulo":
-            page.title(),
-
-        "url":
-            page.url
+        "termo": termo,
+        "titulo": page.title(),
+        "url": page.url
     }
 
 
 # =========================================================
-# COLETAR PRODUTOS
+# COLETAR PRODUTOS DA PÁGINA
 # =========================================================
 
 def coletar_produtos(page):
@@ -252,13 +215,9 @@ def coletar_produtos(page):
 
     vistos = set()
 
-    for i in range(
-        total
-    ):
+    for i in range(total):
 
-        link = links.nth(
-            i
-        )
+        link = links.nth(i)
 
         try:
 
@@ -274,65 +233,47 @@ def coletar_produtos(page):
             if href in vistos:
                 continue
 
-            if (
-                "/cliente-mateus-mais/"
-                in href
-            ):
+            if "/cliente-mateus-mais/" in href:
                 continue
 
-            vistos.add(
-                href
-            )
+            vistos.add(href)
 
             texto_link = ""
 
             try:
-
                 texto_link = (
                     link.inner_text(
                         timeout=1500
                     ) or ""
                 ).strip()
-
             except Exception:
                 pass
-
 
             pai_texto = ""
 
             try:
-
                 pai_texto = (
                     link
-                    .locator(
-                        "xpath=.."
-                    )
+                    .locator("xpath=..")
                     .inner_text(
                         timeout=1500
                     ) or ""
                 ).strip()
-
             except Exception:
                 pass
-
 
             avo_texto = ""
 
             try:
-
                 avo_texto = (
                     link
-                    .locator(
-                        "xpath=../.."
-                    )
+                    .locator("xpath=../..")
                     .inner_text(
                         timeout=1500
                     ) or ""
                 ).strip()
-
             except Exception:
                 pass
-
 
             contexto = "\n".join(
                 [
@@ -342,62 +283,42 @@ def coletar_produtos(page):
                 ]
             ).strip()
 
-
             linhas = [
                 linha.strip()
                 for linha in contexto.split("\n")
                 if linha.strip()
             ]
 
-
             nome = ""
 
             for linha in linhas:
 
-                linha_lower = (
-                    linha.lower()
-                )
+                linha_lower = linha.lower()
 
                 if (
-                    not linha.startswith(
-                        "R$"
-                    )
-                    and "adicionar"
-                    not in linha_lower
-                    and "comprar"
-                    not in linha_lower
+                    not linha.startswith("R$")
+                    and "adicionar" not in linha_lower
+                    and "comprar" not in linha_lower
                     and len(linha) > 3
                 ):
-
                     nome = linha
-
                     break
-
 
             preco = extrair_preco(
                 contexto
             )
 
-
             produtos.append(
                 {
-                    "nome":
-                        nome,
-
-                    "preco":
-                        preco,
-
-                    "texto_bruto":
-                        contexto[:800],
-
-                    "href":
-                        href
+                    "nome": nome,
+                    "preco": preco,
+                    "texto_bruto": contexto[:800],
+                    "href": href
                 }
             )
 
         except Exception:
             pass
-
 
     return produtos
 
@@ -414,21 +335,16 @@ def home():
 
     return jsonify(
         {
-            "status":
-                "online",
-
-            "servico":
-                "Agente Lista de Compras",
-
-            "mercado":
-                "Mateus Cohama",
-
+            "status": "online",
+            "servico": "Agente Lista de Compras",
+            "mercado": "Mateus Cohama",
             "rotas": [
                 "/",
                 "/teste",
                 "/diagnostico",
                 "/buscar?q=arroz",
                 "/capturar-api?q=arroz",
+                "/descobrir-busca?q=arroz",
                 "/executar-compra"
             ]
         }
@@ -436,7 +352,7 @@ def home():
 
 
 # =========================================================
-# TESTE SIMPLES
+# TESTE
 # =========================================================
 
 @app.route(
@@ -449,9 +365,7 @@ def teste():
 
         with sync_playwright() as p:
 
-            browser = criar_browser(
-                p
-            )
+            browser = criar_browser(p)
 
             page = criar_pagina(
                 browser
@@ -463,33 +377,21 @@ def teste():
 
             browser.close()
 
-
         return jsonify(
             {
-                "status":
-                    "ok",
-
-                "titulo":
-                    dados_site["titulo"],
-
-                "url":
-                    dados_site["url"]
+                "status": "ok",
+                "titulo": dados_site["titulo"],
+                "url": dados_site["url"]
             }
         )
-
 
     except Exception as e:
 
         return jsonify(
             {
-                "status":
-                    "erro",
-
-                "erro":
-                    str(e),
-
-                "trace":
-                    traceback.format_exc()
+                "status": "erro",
+                "erro": str(e),
+                "trace": traceback.format_exc()
             }
         ), 500
 
@@ -508,9 +410,7 @@ def diagnostico():
 
         with sync_playwright() as p:
 
-            browser = criar_browser(
-                p
-            )
+            browser = criar_browser(p)
 
             page = criar_pagina(
                 browser
@@ -533,15 +433,10 @@ def diagnostico():
             total = inputs.count()
 
             for i in range(
-                min(
-                    total,
-                    20
-                )
+                min(total, 20)
             ):
 
-                el = inputs.nth(
-                    i
-                )
+                el = inputs.nth(i)
 
                 candidatos.append(
                     {
@@ -581,39 +476,23 @@ def diagnostico():
 
             browser.close()
 
-
         return jsonify(
             {
-                "status":
-                    "ok",
-
-                "titulo":
-                    titulo,
-
-                "url":
-                    url,
-
-                "quantidade_inputs":
-                    total,
-
-                "inputs":
-                    candidatos
+                "status": "ok",
+                "titulo": titulo,
+                "url": url,
+                "quantidade_inputs": total,
+                "inputs": candidatos
             }
         )
-
 
     except Exception as e:
 
         return jsonify(
             {
-                "status":
-                    "erro",
-
-                "erro":
-                    str(e),
-
-                "trace":
-                    traceback.format_exc()
+                "status": "erro",
+                "erro": str(e),
+                "trace": traceback.format_exc()
             }
         ), 500
 
@@ -633,88 +512,65 @@ def buscar():
         "arroz"
     ).strip()
 
-
     if not termo:
 
         return jsonify(
             {
-                "status":
-                    "erro",
-
+                "status": "erro",
                 "mensagem":
                     "Informe um produto para pesquisar."
             }
         ), 400
 
-
     try:
 
         with sync_playwright() as p:
 
-            browser = criar_browser(
-                p
-            )
+            browser = criar_browser(p)
 
             page = criar_pagina(
                 browser
             )
-
 
             resultado = executar_busca(
                 page,
                 termo
             )
 
-
             produtos = coletar_produtos(
                 page
             )
 
-
             resultado[
                 "quantidade_produtos_detectados"
-            ] = len(
-                produtos
-            )
-
+            ] = len(produtos)
 
             resultado[
                 "produtos"
             ] = produtos[:20]
 
-
             browser.close()
-
 
         return jsonify(
             {
-                "status":
-                    "ok",
-
-                "resultado":
-                    resultado
+                "status": "ok",
+                "resultado": resultado
             }
         )
-
 
     except Exception as e:
 
         return jsonify(
             {
-                "status":
-                    "erro",
-
-                "erro":
-                    str(e),
-
-                "trace":
-                    traceback.format_exc()
+                "status": "erro",
+                "erro": str(e),
+                "trace": traceback.format_exc()
             }
         ), 500
 
 
 # =========================================================
-# CAPTURAR API INTERNA
+# CAPTURAR API
 # =========================================================
 
 @app.route(
@@ -734,21 +590,13 @@ def capturar_api():
 
         respostas = []
 
-
         with sync_playwright() as p:
 
-            browser = criar_browser(
-                p
-            )
+            browser = criar_browser(p)
 
             page = criar_pagina(
                 browser
             )
-
-
-            # ============================================
-            # REQUESTS
-            # ============================================
 
             def registrar_request(req):
 
@@ -776,10 +624,6 @@ def capturar_api():
                     pass
 
 
-            # ============================================
-            # RESPONSES
-            # ============================================
-
             def registrar_response(resp):
 
                 try:
@@ -792,7 +636,6 @@ def capturar_api():
                     ]:
                         return
 
-
                     content_type = (
                         resp.headers.get(
                             "content-type",
@@ -800,9 +643,7 @@ def capturar_api():
                         )
                     )
 
-
                     registro = {
-
                         "status":
                             resp.status,
 
@@ -811,9 +652,7 @@ def capturar_api():
 
                         "content_type":
                             content_type
-
                     }
-
 
                     if (
                         "application/json"
@@ -824,24 +663,18 @@ def capturar_api():
 
                             dados = resp.json()
 
-                            texto = str(
-                                dados
-                            )
-
-
                             registro[
                                 "amostra"
-                            ] = texto[:2000]
-
+                            ] = str(
+                                dados
+                            )[:2000]
 
                         except Exception:
                             pass
 
-
                     respostas.append(
                         registro
                     )
-
 
                 except Exception:
                     pass
@@ -852,100 +685,61 @@ def capturar_api():
                 registrar_request
             )
 
-
             page.on(
                 "response",
                 registrar_response
             )
 
-
-            # ============================================
-            # ABRIR MATEUS
-            # ============================================
-
             abrir_mateus(
                 page
             )
 
-
-            # Ignora chamadas iniciais
             chamadas.clear()
             respostas.clear()
-
-
-            # ============================================
-            # BUSCAR
-            # ============================================
 
             campo = page.locator(
                 "#search-autocomplete-input"
             )
-
 
             campo.wait_for(
                 state="visible",
                 timeout=30000
             )
 
-
             campo.fill(
                 termo
             )
-
 
             page.wait_for_timeout(
                 500
             )
 
-
             campo.press(
                 "Enter"
             )
-
 
             page.wait_for_timeout(
                 5000
             )
 
-
             browser.close()
 
-
-        # ============================================
-        # FILTRAR ENDPOINTS PROVÁVEIS
-        # ============================================
-
         palavras = [
-
             "product",
-
             "produto",
-
             "search",
-
             "busca",
-
             "catalog",
-
             "catalogo",
-
             "graphql",
-
             "sku",
-
             "offer",
-
             "price",
-
             "pricing",
-
             "market"
-
         ]
 
-
         candidatos = []
-
 
         for resposta in respostas:
 
@@ -958,7 +752,6 @@ def capturar_api():
                 .lower()
             )
 
-
             if any(
                 palavra in url_lower
                 for palavra in palavras
@@ -968,6 +761,158 @@ def capturar_api():
                     resposta
                 )
 
+        return jsonify(
+            {
+                "status": "ok",
+                "termo": termo,
+                "total_chamadas": len(
+                    chamadas
+                ),
+                "total_respostas": len(
+                    respostas
+                ),
+                "candidatos":
+                    candidatos[:30],
+                "todas_respostas":
+                    respostas[:50]
+            }
+        )
+
+    except Exception as e:
+
+        return jsonify(
+            {
+                "status": "erro",
+                "erro": str(e),
+                "trace": traceback.format_exc()
+            }
+        ), 500
+
+
+# =========================================================
+# DESCOBRIR FORMATO DA BUSCA
+# =========================================================
+
+@app.route(
+    "/descobrir-busca",
+    methods=["GET"]
+)
+def descobrir_busca():
+
+    termo = request.args.get(
+        "q",
+        "arroz"
+    ).strip()
+
+    try:
+
+        requests_capturados = []
+
+        with sync_playwright() as p:
+
+            browser = criar_browser(p)
+
+            page = criar_pagina(
+                browser
+            )
+
+            def registrar_request(req):
+
+                try:
+
+                    url = req.url.lower()
+
+                    if (
+                        "api/products/internal/v1/service"
+                        not in url
+                    ):
+                        return
+
+                    headers = req.headers
+
+                    registro = {
+                        "url":
+                            req.url,
+
+                        "metodo":
+                            req.method,
+
+                        "resource_type":
+                            req.resource_type,
+
+                        "post_data":
+                            req.post_data,
+
+                        "content_type":
+                            headers.get(
+                                "content-type",
+                                ""
+                            ),
+
+                        "accept":
+                            headers.get(
+                                "accept",
+                                ""
+                            ),
+
+                        "referer":
+                            headers.get(
+                                "referer",
+                                ""
+                            ),
+
+                        "origin":
+                            headers.get(
+                                "origin",
+                                ""
+                            )
+                    }
+
+                    requests_capturados.append(
+                        registro
+                    )
+
+                except Exception:
+                    pass
+
+
+            page.on(
+                "request",
+                registrar_request
+            )
+
+            abrir_mateus(
+                page
+            )
+
+            requests_capturados.clear()
+
+            campo = page.locator(
+                "#search-autocomplete-input"
+            )
+
+            campo.wait_for(
+                state="visible",
+                timeout=30000
+            )
+
+            campo.fill(
+                termo
+            )
+
+            page.wait_for_timeout(
+                500
+            )
+
+            campo.press(
+                "Enter"
+            )
+
+            page.wait_for_timeout(
+                5000
+            )
+
+            browser.close()
 
         return jsonify(
             {
@@ -977,24 +922,15 @@ def capturar_api():
                 "termo":
                     termo,
 
-                "total_chamadas":
+                "quantidade":
                     len(
-                        chamadas
+                        requests_capturados
                     ),
 
-                "total_respostas":
-                    len(
-                        respostas
-                    ),
-
-                "candidatos":
-                    candidatos[:30],
-
-                "todas_respostas":
-                    respostas[:50]
+                "requests":
+                    requests_capturados
             }
         )
-
 
     except Exception as e:
 
@@ -1013,7 +949,7 @@ def capturar_api():
 
 
 # =========================================================
-# PESQUISAR PRODUTO PARA COMPRA
+# PESQUISAR PRODUTO
 # =========================================================
 
 def pesquisar_produto(
@@ -1023,7 +959,6 @@ def pesquisar_produto(
 ):
 
     resultado = {
-
         "item":
             nome,
 
@@ -1038,9 +973,7 @@ def pesquisar_produto(
 
         "preferencias_interpretadas":
             preferencias
-
     }
-
 
     try:
 
@@ -1049,24 +982,19 @@ def pesquisar_produto(
             nome
         )
 
-
         produtos = coletar_produtos(
             page
         )
-
 
         resultado[
             "status"
         ] = "busca_executada"
 
-
         resultado[
             "produtos"
         ] = produtos[:10]
 
-
         return resultado
-
 
     except Exception as e:
 
@@ -1074,11 +1002,9 @@ def pesquisar_produto(
             "status"
         ] = "erro"
 
-
         resultado[
             "mensagem"
         ] = str(e)
-
 
         return resultado
 
@@ -1099,12 +1025,10 @@ def executar_compra():
             force=True
         )
 
-
         itens = dados.get(
             "itens",
             []
         )
-
 
         if not itens:
 
@@ -1118,21 +1042,15 @@ def executar_compra():
                 }
             ), 400
 
-
         resultados = []
-
 
         with sync_playwright() as p:
 
-            browser = criar_browser(
-                p
-            )
-
+            browser = criar_browser(p)
 
             page = criar_pagina(
                 browser
             )
-
 
             for item in itens:
 
@@ -1145,7 +1063,6 @@ def executar_compra():
                     .strip()
                 )
 
-
                 preferencias = (
                     parse_preferencias(
                         item.get(
@@ -1155,13 +1072,11 @@ def executar_compra():
                     )
                 )
 
-
                 resultado = pesquisar_produto(
                     page,
                     nome,
                     preferencias
                 )
-
 
                 resultado[
                     "quantidade"
@@ -1170,14 +1085,11 @@ def executar_compra():
                     "1"
                 )
 
-
                 resultados.append(
                     resultado
                 )
 
-
             browser.close()
-
 
         return jsonify(
             {
@@ -1197,7 +1109,6 @@ def executar_compra():
             }
         )
 
-
     except Exception as e:
 
         return jsonify(
@@ -1215,7 +1126,7 @@ def executar_compra():
 
 
 # =========================================================
-# INICIAR APP
+# INICIAR
 # =========================================================
 
 if __name__ == "__main__":
@@ -1226,7 +1137,6 @@ if __name__ == "__main__":
             5000
         )
     )
-
 
     app.run(
         host="0.0.0.0",
