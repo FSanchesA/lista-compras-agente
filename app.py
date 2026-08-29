@@ -86,7 +86,6 @@ def normalizar_texto(texto):
     }
 
     for origem, destino in substituicoes.items():
-
         texto = texto.replace(
             origem,
             destino
@@ -138,7 +137,6 @@ def quantidade_inteira(valor):
         )
 
     except Exception:
-
         return 1
 
 
@@ -184,13 +182,11 @@ def parse_preferencias(texto):
             )
 
             try:
-
                 limite = float(
                     valor
                 )
 
             except Exception:
-
                 limite = None
 
             descricao = re.sub(
@@ -201,7 +197,6 @@ def parse_preferencias(texto):
             ).strip()
 
         else:
-
             descricao = parte.strip()
 
         preferencias.append(
@@ -234,27 +229,22 @@ def extrair_tamanho(texto):
     )
 
     padroes = [
-
         (
             r"(\d+(?:[.,]\d+)?)\s*kg",
             "KG"
         ),
-
         (
             r"(\d+(?:[.,]\d+)?)\s*g",
             "G"
         ),
-
         (
             r"(\d+(?:[.,]\d+)?)\s*l",
             "L"
         ),
-
         (
             r"(\d+(?:[.,]\d+)?)\s*ml",
             "ML"
         )
-
     ]
 
     for padrao, tipo in padroes:
@@ -286,7 +276,6 @@ def extrair_tamanho(texto):
             }
 
         except Exception:
-
             return None
 
     return None
@@ -348,12 +337,28 @@ def extrair_produto_id(produto):
             "",
             "None"
         ]:
-
             return str(
                 valor
             )
 
     return None
+
+
+def id_produto_valido(produto_id):
+
+    if not produto_id:
+        return False
+
+    produto_id = str(
+        produto_id
+    ).strip()
+
+    return bool(
+        re.fullmatch(
+            r"[A-Za-z0-9_-]{8,100}",
+            produto_id
+        )
+    )
 
 
 # =========================================================
@@ -363,23 +368,18 @@ def extrair_produto_id(produto):
 def preco_efetivo(produto):
 
     candidatos = [
-
         produto.get(
             "sale_price"
         ),
-
         produto.get(
             "low_price"
         ),
-
         produto.get(
             "bulk_price"
         ),
-
         produto.get(
             "price"
         )
-
     ]
 
     for valor in candidatos:
@@ -391,7 +391,6 @@ def preco_efetivo(produto):
             )
             and valor > 0
         ):
-
             return float(
                 valor
             )
@@ -438,21 +437,18 @@ def normalizar_produto(produto):
             )
 
             if tipo_medida == "KG":
-
                 preco_por_medida = (
                     preco /
                     medida_float
                 )
 
             elif tipo_medida == "L":
-
                 preco_por_medida = (
                     preco /
                     medida_float
                 )
 
             elif tipo_medida == "G":
-
                 preco_por_medida = (
                     preco /
                     (
@@ -462,7 +458,6 @@ def normalizar_produto(produto):
                 )
 
             elif tipo_medida == "ML":
-
                 preco_por_medida = (
                     preco /
                     (
@@ -472,7 +467,6 @@ def normalizar_produto(produto):
                 )
 
     except Exception:
-
         preco_por_medida = None
 
     return {
@@ -586,6 +580,99 @@ def normalizar_produto(produto):
 
 
 # =========================================================
+# PRODUTO PARA CURADORIA
+# =========================================================
+
+def produto_curadoria(produto):
+
+    if not produto:
+        return None
+
+    return {
+
+        "id":
+            extrair_produto_id(
+                produto
+            ),
+
+        "sku":
+            produto.get(
+                "sku"
+            ),
+
+        "barcode":
+            produto.get(
+                "barcode"
+            ),
+
+        "nome":
+            produto.get(
+                "nome"
+            ),
+
+        "marca":
+            produto.get(
+                "marca"
+            ),
+
+        "preco":
+            produto.get(
+                "preco_efetivo"
+            ),
+
+        "preco_efetivo":
+            produto.get(
+                "preco_efetivo"
+            ),
+
+        "preco_normal":
+            produto.get(
+                "preco_normal"
+            ),
+
+        "preco_promocional":
+            produto.get(
+                "preco_promocional"
+            ),
+
+        "medida":
+            produto.get(
+                "medida"
+            ),
+
+        "tipo_medida":
+            produto.get(
+                "tipo_medida"
+            ),
+
+        "imagem":
+            produto.get(
+                "imagem"
+            ),
+
+        "estoque":
+            produto.get(
+                "estoque"
+            ),
+
+        "categoria":
+            produto.get(
+                "categoria"
+            ),
+
+        "departamento":
+            produto.get(
+                "departamento"
+            ),
+
+        "secao":
+            produto.get(
+                "secao"
+            )
+    }
+
+
+# =========================================================
 # BUSCA API
 # =========================================================
 
@@ -596,15 +683,12 @@ def buscar_produtos_api(
 ):
 
     facet_filters = [
-
         [
             f"market_id:{MARKET_ID}"
         ],
-
         [
             "for_sale:true"
         ]
-
     ]
 
     params_busca = urlencode(
@@ -698,7 +782,6 @@ def buscar_produtos_api(
     ]
 
     return {
-
         "termo":
             termo,
 
@@ -726,7 +809,6 @@ def produto_disponivel(
     if produto.get(
         "for_sale"
     ) is False:
-
         return False
 
     estoque = produto.get(
@@ -737,19 +819,16 @@ def produto_disponivel(
         estoque is not None
         and estoque <= 0
     ):
-
         return False
 
     if produto.get(
         "preco_efetivo"
     ) is None:
-
         return False
 
     if not extrair_produto_id(
         produto
     ):
-
         return False
 
     return True
@@ -779,17 +858,14 @@ def tamanho_compativel(
         medida is None
         or tipo is None
     ):
-
         return False
 
     try:
-
         medida = float(
             medida
         )
 
     except Exception:
-
         return False
 
     valor = float(
@@ -1074,34 +1150,6 @@ def equivalencia_semantica(
     produto
 ):
 
-    """
-    Regra principal:
-
-    1 conceito:
-    pode aparecer no nome, categoria ou seção.
-
-    2 conceitos:
-    os dois precisam estar no NOME.
-
-    3+ conceitos:
-    os dois primeiros precisam estar no NOME
-    e pelo menos 75% dos termos totais também.
-
-    Exemplos:
-
-    Peito de frango
-    -> precisa conter PEITO + FRANGO no nome.
-
-    Galinha Congelada Inteira
-    -> reprova.
-
-    Água micelar
-    -> precisa conter ÁGUA + MICELAR no nome.
-
-    Papel manteiga
-    -> precisa conter PAPEL + MANTEIGA no nome.
-    """
-
     termos = termos_significativos(
         item
     )
@@ -1130,10 +1178,6 @@ def equivalencia_semantica(
         )
     )
 
-    # =====================================================
-    # UM CONCEITO
-    # =====================================================
-
     if len(
         termos
     ) == 1:
@@ -1148,10 +1192,6 @@ def equivalencia_semantica(
             or termo in secao
         )
 
-    # =====================================================
-    # DOIS CONCEITOS
-    # =====================================================
-
     if len(
         termos
     ) == 2:
@@ -1160,10 +1200,6 @@ def equivalencia_semantica(
             termo in nome
             for termo in termos
         )
-
-    # =====================================================
-    # TRÊS OU MAIS CONCEITOS
-    # =====================================================
 
     conceitos_principais = termos[
         :2
@@ -1194,45 +1230,30 @@ def equivalencia_semantica(
 
 
 # =========================================================
-# QUALIFICADORES ESPECIAIS
+# QUALIFICADORES
 # =========================================================
 
 QUALIFICADORES_ESPECIAIS = [
-
     "defumado",
     "defumada",
-
     "light",
-
     "diet",
-
     "zero",
-
     "premium",
-
     "especial",
-
     "gourmet",
-
     "bifasico",
     "bifasica",
-
     "regenerador",
     "regeneradora",
-
     "detox",
-
     "profissional",
-
     "importado",
     "importada",
-
     "temperado",
     "temperada",
-
     "empanado",
     "empanada",
-
     "recheado",
     "recheada"
 ]
@@ -1263,7 +1284,6 @@ def penalidade_qualificadores(
             and
             qualificador not in termo_item
         ):
-
             penalidade += 0.25
 
     return min(
@@ -1386,7 +1406,6 @@ def tamanho_referencia(
         if produto.get(
             "tipo_medida"
         ) != tipo:
-
             continue
 
         try:
@@ -1398,13 +1417,11 @@ def tamanho_referencia(
             )
 
             if medida > 0:
-
                 medidas.append(
                     medida
                 )
 
         except Exception:
-
             continue
 
     if not medidas:
@@ -1428,7 +1445,6 @@ def penalidade_embalagem(
         medida is None
         or referencia is None
     ):
-
         return 0.40
 
     try:
@@ -1445,7 +1461,6 @@ def penalidade_embalagem(
             medida <= 0
             or referencia <= 0
         ):
-
             return 0.40
 
         razao = (
@@ -1454,28 +1469,23 @@ def penalidade_embalagem(
         )
 
         if razao < 0.40:
-
             return 1.20
 
         if razao < 0.65:
-
             return 0.70
 
         if (
             razao >= 0.65
             and razao <= 1.60
         ):
-
             return 0
 
         if razao <= 2.30:
-
             return 0.35
 
         return 0.90
 
     except Exception:
-
         return 0.40
 
 
@@ -1499,10 +1509,6 @@ def escolher_melhor_custo_beneficio(
     if not disponiveis:
         return None
 
-    # =====================================================
-    # FILTRO SEMÂNTICO
-    # =====================================================
-
     semanticamente_validos = [
         produto
         for produto in disponiveis
@@ -1513,14 +1519,9 @@ def escolher_melhor_custo_beneficio(
     ]
 
     if semanticamente_validos:
-
         disponiveis = (
             semanticamente_validos
         )
-
-    # =====================================================
-    # MEDIDA DOMINANTE
-    # =====================================================
 
     tipo_dominante = (
         tipo_medida_dominante(
@@ -1537,22 +1538,14 @@ def escolher_melhor_custo_beneficio(
             tipo_dominante
         )
 
-    # =====================================================
-    # MENOR PREÇO ABSOLUTO
-    # =====================================================
-
     precos_absolutos = [
-
         produto.get(
             "preco_efetivo"
         )
-
         for produto in disponiveis
-
         if produto.get(
             "preco_efetivo"
         ) is not None
-
     ]
 
     menor_preco = (
@@ -1563,35 +1556,25 @@ def escolher_melhor_custo_beneficio(
         else 1
     )
 
-    # =====================================================
-    # MENOR PREÇO POR MEDIDA
-    # =====================================================
-
     precos_medida = [
-
         produto.get(
             "preco_por_medida"
         )
-
         for produto in disponiveis
-
         if (
             produto.get(
                 "preco_por_medida"
-            )
-            is not None
+            ) is not None
             and
             (
                 not tipo_dominante
                 or
                 produto.get(
                     "tipo_medida"
-                )
-                ==
+                ) ==
                 tipo_dominante
             )
         )
-
     ]
 
     menor_preco_medida = (
@@ -1632,27 +1615,17 @@ def escolher_melhor_custo_beneficio(
             produto
         )
 
-        # -----------------------------------------
-        # PREÇO ABSOLUTO
-        # -----------------------------------------
-
         if (
             preco
             and menor_preco > 0
         ):
-
             score_preco_absoluto = (
                 preco /
                 menor_preco
             )
 
         else:
-
             score_preco_absoluto = 2
-
-        # -----------------------------------------
-        # PREÇO POR MEDIDA
-        # -----------------------------------------
 
         if (
             preco_medida is not None
@@ -1661,19 +1634,13 @@ def escolher_melhor_custo_beneficio(
             and
             menor_preco_medida > 0
         ):
-
             score_preco_medida = (
                 preco_medida /
                 menor_preco_medida
             )
 
         else:
-
             score_preco_medida = 1.5
-
-        # -----------------------------------------
-        # EMBALAGEM
-        # -----------------------------------------
 
         if (
             tipo_dominante
@@ -1681,7 +1648,6 @@ def escolher_melhor_custo_beneficio(
             tipo ==
             tipo_dominante
         ):
-
             penalidade_tamanho = (
                 penalidade_embalagem(
                     medida,
@@ -1690,12 +1656,7 @@ def escolher_melhor_custo_beneficio(
             )
 
         else:
-
             penalidade_tamanho = 0.70
-
-        # -----------------------------------------
-        # QUALIFICADORES
-        # -----------------------------------------
 
         penalidade_especial = (
             penalidade_qualificadores(
@@ -1704,28 +1665,16 @@ def escolher_melhor_custo_beneficio(
             )
         )
 
-        # -----------------------------------------
-        # RELEVÂNCIA
-        # -----------------------------------------
-
         penalidade_relevancia = (
             1 -
             relevancia
         )
-
-        # -----------------------------------------
-        # SEMÂNTICA
-        # -----------------------------------------
 
         penalidade_semantica = (
             0
             if semantica_ok
             else 2.0
         )
-
-        # -----------------------------------------
-        # ESTOQUE
-        # -----------------------------------------
 
         penalidade_estoque = 0
 
@@ -1738,56 +1687,35 @@ def escolher_melhor_custo_beneficio(
             )
 
             if estoque <= 2:
-
                 penalidade_estoque = 0.35
 
             elif estoque <= 5:
-
                 penalidade_estoque = 0.15
 
         except Exception:
-
             pass
 
-        # =================================================
-        # SCORE FINAL
-        # =================================================
-
         score_final = (
-
             score_preco_absoluto
             * 0.25
-
             +
-
             score_preco_medida
             * 0.25
-
             +
-
             penalidade_tamanho
             * 0.15
-
             +
-
             penalidade_especial
             * 0.20
-
             +
-
             penalidade_relevancia
             * 0.15
-
             +
-
             penalidade_semantica
             * 1.00
-
             +
-
             penalidade_estoque
             * 0.05
-
         )
 
         ranking.append(
@@ -1838,53 +1766,34 @@ def escolher_melhor_custo_beneficio(
         0
     ]
 
-    top_3 = []
+    alternativas = []
 
     for candidato in ranking[
-        :3
+        :5
     ]:
 
         produto = candidato[
             "produto"
         ]
 
-        top_3.append(
-            {
-                "nome":
-                    produto.get(
-                        "nome"
-                    ),
+        produto_alt = produto_curadoria(
+            produto
+        )
 
-                "marca":
-                    produto.get(
-                        "marca"
-                    ),
+        produto_alt[
+            "score"
+        ] = candidato[
+            "score"
+        ]
 
-                "preco":
-                    produto.get(
-                        "preco_efetivo"
-                    ),
+        produto_alt[
+            "semantica_ok"
+        ] = candidato[
+            "semantica_ok"
+        ]
 
-                "medida":
-                    produto.get(
-                        "medida"
-                    ),
-
-                "tipo_medida":
-                    produto.get(
-                        "tipo_medida"
-                    ),
-
-                "semantica_ok":
-                    candidato[
-                        "semantica_ok"
-                    ],
-
-                "score":
-                    candidato[
-                        "score"
-                    ]
-            }
+        alternativas.append(
+            produto_alt
         )
 
     return {
@@ -1910,8 +1819,8 @@ def escolher_melhor_custo_beneficio(
         "tamanho_referencia":
             referencia,
 
-        "top_3":
-            top_3
+        "alternativas":
+            alternativas
     }
 
 
@@ -1941,7 +1850,6 @@ def decidir_item(
     if not produtos:
 
         return {
-
             "status":
                 "NAO_ENCONTRADO",
 
@@ -1953,6 +1861,9 @@ def decidir_item(
 
             "sugestao":
                 None,
+
+            "alternativas":
+                [],
 
             "motivo":
                 "Nenhum produto retornado pela busca."
@@ -1971,6 +1882,38 @@ def decidir_item(
         )
 
         if escolha:
+
+            custo = escolher_melhor_custo_beneficio(
+                nome,
+                produtos
+            )
+
+            alternativas = (
+                custo.get(
+                    "alternativas",
+                    []
+                )
+                if custo
+                else []
+            )
+
+            escolhido_id = extrair_produto_id(
+                escolha.get(
+                    "escolhido"
+                )
+            )
+
+            alternativas = [
+                alt
+                for alt in alternativas
+                if alt.get(
+                    "id"
+                ) != escolhido_id
+            ]
+
+            escolha[
+                "alternativas"
+            ] = alternativas
 
             return escolha
 
@@ -2006,9 +1949,10 @@ def decidir_item(
 
             "alternativas":
                 (
-                    alternativa[
-                        "top_3"
-                    ]
+                    alternativa.get(
+                        "alternativas",
+                        []
+                    )
                     if alternativa
                     else []
                 ),
@@ -2032,7 +1976,6 @@ def decidir_item(
     if not custo:
 
         return {
-
             "status":
                 "NAO_ENCONTRADO",
 
@@ -2045,9 +1988,29 @@ def decidir_item(
             "sugestao":
                 None,
 
+            "alternativas":
+                [],
+
             "motivo":
                 "Nenhum produto disponível."
         }
+
+    escolhido_id = extrair_produto_id(
+        custo[
+            "produto"
+        ]
+    )
+
+    alternativas = [
+        alt
+        for alt in custo.get(
+            "alternativas",
+            []
+        )
+        if alt.get(
+            "id"
+        ) != escolhido_id
+    ]
 
     return {
 
@@ -2096,9 +2059,7 @@ def decidir_item(
             },
 
         "alternativas":
-            custo[
-                "top_3"
-            ]
+            alternativas
     }
 
 
@@ -2164,7 +2125,6 @@ def sessao_existe():
         )
 
     except Exception:
-
         return False
 
 
@@ -2205,7 +2165,6 @@ def capturar_session_storage(
                     i < sessionStorage.length;
                     i++
                 ) {
-
                     const chave =
                         sessionStorage.key(i);
 
@@ -2235,7 +2194,6 @@ def capturar_session_storage(
         )
 
     except Exception:
-
         return 0
 
 
@@ -2317,7 +2275,6 @@ def gerar_sessao():
             )
 
         except Exception:
-
             pass
 
         page.wait_for_timeout(
@@ -2347,7 +2304,6 @@ def gerar_sessao():
         browser.close()
 
     return {
-
         "status":
             "LOGIN_OK",
 
@@ -2434,7 +2390,6 @@ def obter_auth_token():
             parsed,
             str
         ):
-
             return parsed
 
         if isinstance(
@@ -2452,7 +2407,6 @@ def obter_auth_token():
                 if parsed.get(
                     chave
                 ):
-
                     return str(
                         parsed[
                             chave
@@ -2460,7 +2414,6 @@ def obter_auth_token():
                     )
 
     except Exception:
-
         pass
 
     return str(
@@ -2482,7 +2435,6 @@ def garantir_sessao():
     ):
 
         return {
-
             "status":
                 "SESSAO_REUTILIZADA",
 
@@ -2493,7 +2445,6 @@ def garantir_sessao():
     resultado = gerar_sessao()
 
     return {
-
         "status":
             resultado[
                 "status"
@@ -2562,10 +2513,15 @@ def enviar_lote_carrinho(
     produtos_payload
 ):
 
+    if not produtos_payload:
+
+        raise Exception(
+            "Nenhum produto aprovado para enviar."
+        )
+
     session = criar_requests_session()
 
     payload = {
-
         "products":
             produtos_payload,
 
@@ -2588,17 +2544,19 @@ def enviar_lote_carrinho(
     )
 
     dados = None
+    resposta_texto = None
 
     try:
-
         dados = resposta.json()
 
     except Exception:
-
-        pass
+        resposta_texto = (
+            resposta.text[
+                :1000
+            ]
+        )
 
     return {
-
         "sucesso":
             resposta.status_code
             in [
@@ -2615,13 +2573,16 @@ def enviar_lote_carrinho(
         "resposta":
             dados,
 
+        "resposta_texto":
+            resposta_texto,
+
         "token_exposto":
             False
     }
 
 
 # =========================================================
-# PREPARAR LOTE
+# PREPARAR LOTE AUTOMÁTICO
 # =========================================================
 
 def preparar_lote(
@@ -2630,11 +2591,8 @@ def preparar_lote(
 ):
 
     produtos_lote = []
-
     analisados = []
-
     ignorados = []
-
     total_estimado = 0.0
 
     for entrada in itens:
@@ -2703,7 +2661,6 @@ def preparar_lote(
         ):
 
             if aceitar_alternativas:
-
                 produto = decisao.get(
                     "sugestao"
                 )
@@ -2727,8 +2684,10 @@ def preparar_lote(
                             ),
 
                         "sugestao":
-                            decisao.get(
-                                "sugestao"
+                            produto_curadoria(
+                                decisao.get(
+                                    "sugestao"
+                                )
                             ),
 
                         "alternativas":
@@ -2817,38 +2776,9 @@ def preparar_lote(
                     ),
 
                 "produto":
-                    {
-                        "id":
-                            produto_id,
-
-                        "sku":
-                            produto.get(
-                                "sku"
-                            ),
-
-                        "nome":
-                            produto.get(
-                                "nome"
-                            ),
-
-                        "marca":
-                            produto.get(
-                                "marca"
-                            ),
-
-                        "preco":
-                            preco,
-
-                        "medida":
-                            produto.get(
-                                "medida"
-                            ),
-
-                        "tipo_medida":
-                            produto.get(
-                                "tipo_medida"
-                            )
-                    },
+                    produto_curadoria(
+                        produto
+                    ),
 
                 "subtotal":
                     round(
@@ -2882,7 +2812,6 @@ def preparar_lote(
             consolidado[
                 produto_id
             ] = {
-
                 "id":
                     produto_id,
 
@@ -2902,7 +2831,6 @@ def preparar_lote(
         ]
 
     return {
-
         "produtos_payload":
             list(
                 consolidado.values()
@@ -2943,6 +2871,201 @@ def preparar_lote(
 
 
 # =========================================================
+# PREPARAR LOTE VALIDADO PELO USUÁRIO
+# =========================================================
+
+def preparar_lote_validado(
+    produtos
+):
+
+    consolidado = {}
+    itens_validos = []
+    itens_invalidos = []
+    total_estimado = 0.0
+
+    for entrada in produtos:
+
+        if not isinstance(
+            entrada,
+            dict
+        ):
+
+            itens_invalidos.append(
+                {
+                    "motivo":
+                        "Entrada inválida."
+                }
+            )
+
+            continue
+
+        produto_id = str(
+            entrada.get(
+                "id",
+                ""
+            )
+        ).strip()
+
+        quantidade = quantidade_inteira(
+            entrada.get(
+                "quantidade",
+                entrada.get(
+                    "quantity",
+                    1
+                )
+            )
+        )
+
+        if not id_produto_valido(
+            produto_id
+        ):
+
+            itens_invalidos.append(
+                {
+                    "item":
+                        entrada.get(
+                            "item"
+                        ),
+
+                    "nome":
+                        entrada.get(
+                            "nome"
+                        ),
+
+                    "motivo":
+                        "Produto sem ID válido."
+                }
+            )
+
+            continue
+
+        if produto_id not in consolidado:
+
+            consolidado[
+                produto_id
+            ] = {
+                "id":
+                    produto_id,
+
+                "quantity":
+                    0,
+
+                "market_id":
+                    MARKET_ID
+            }
+
+        consolidado[
+            produto_id
+        ][
+            "quantity"
+        ] += quantidade
+
+        preco = entrada.get(
+            "preco",
+            entrada.get(
+                "preco_efetivo"
+            )
+        )
+
+        subtotal = 0.0
+
+        try:
+
+            if preco is not None:
+                subtotal = (
+                    float(
+                        preco
+                    )
+                    *
+                    quantidade
+                )
+
+        except Exception:
+            subtotal = 0.0
+
+        total_estimado += subtotal
+
+        itens_validos.append(
+            {
+                "item":
+                    entrada.get(
+                        "item"
+                    ),
+
+                "id":
+                    produto_id,
+
+                "sku":
+                    entrada.get(
+                        "sku"
+                    ),
+
+                "nome":
+                    entrada.get(
+                        "nome"
+                    ),
+
+                "marca":
+                    entrada.get(
+                        "marca"
+                    ),
+
+                "preco":
+                    preco,
+
+                "quantidade":
+                    quantidade,
+
+                "subtotal":
+                    round(
+                        subtotal,
+                        2
+                    ),
+
+                "imagem":
+                    entrada.get(
+                        "imagem"
+                    ),
+
+                "origem":
+                    entrada.get(
+                        "origem",
+                        "CURADORIA_USUARIO"
+                    )
+            }
+        )
+
+    return {
+        "produtos_payload":
+            list(
+                consolidado.values()
+            ),
+
+        "itens_validos":
+            itens_validos,
+
+        "itens_invalidos":
+            itens_invalidos,
+
+        "quantidade_itens":
+            len(
+                itens_validos
+            ),
+
+        "quantidade_ids_unicos":
+            len(
+                consolidado
+            ),
+
+        "total_estimado":
+            round(
+                total_estimado,
+                2
+            )
+    }
+
+
+# =========================================================
 # HOME
 # =========================================================
 
@@ -2963,12 +3086,16 @@ def home():
             "mercado":
                 "Mateus Cohama",
 
+            "market_id":
+                MARKET_ID,
+
             "rotas": [
                 "/",
                 "/gerar-sessao",
                 "/status-sessao",
                 "/executar-compra",
-                "/montar-carrinho"
+                "/montar-carrinho",
+                "/montar-carrinho-validado"
             ]
         }
     )
@@ -3012,7 +3139,17 @@ def gerar_sessao_route():
 
     try:
 
+        inicio = time.time()
+
         resultado = gerar_sessao()
+
+        resultado[
+            "tempo_segundos"
+        ] = round(
+            time.time() -
+            inicio,
+            2
+        )
 
         return jsonify(
             {
@@ -3052,6 +3189,8 @@ def gerar_sessao_route():
 )
 def executar_compra():
 
+    inicio = time.time()
+
     try:
 
         dados = request.get_json(
@@ -3062,6 +3201,18 @@ def executar_compra():
             "itens",
             []
         )
+
+        if not itens:
+
+            return jsonify(
+                {
+                    "status":
+                        "erro",
+
+                    "mensagem":
+                        "Nenhum item recebido."
+                }
+            ), 400
 
         resultados = []
 
@@ -3089,18 +3240,73 @@ def executar_compra():
                 )
             )
 
-            resultado = decidir_item(
-                nome,
-                preferencias
-            )
+            try:
 
-            resultado[
-                "quantidade"
-            ] = quantidade
+                resultado = decidir_item(
+                    nome,
+                    preferencias
+                )
 
-            resultados.append(
-                resultado
-            )
+                resultado[
+                    "quantidade"
+                ] = quantidade
+
+                if resultado.get(
+                    "escolhido"
+                ):
+
+                    resultado[
+                        "escolhido"
+                    ] = produto_curadoria(
+                        resultado[
+                            "escolhido"
+                        ]
+                    )
+
+                if resultado.get(
+                    "sugestao"
+                ):
+
+                    resultado[
+                        "sugestao"
+                    ] = produto_curadoria(
+                        resultado[
+                            "sugestao"
+                        ]
+                    )
+
+                resultados.append(
+                    resultado
+                )
+
+            except Exception as erro:
+
+                resultados.append(
+                    {
+                        "status":
+                            "ERRO",
+
+                        "item":
+                            nome,
+
+                        "quantidade":
+                            quantidade,
+
+                        "motivo":
+                            str(
+                                erro
+                            ),
+
+                        "escolhido":
+                            None,
+
+                        "sugestao":
+                            None,
+
+                        "alternativas":
+                            []
+                    }
+                )
 
         return jsonify(
             {
@@ -3113,6 +3319,13 @@ def executar_compra():
                 "quantidade_itens":
                     len(
                         resultados
+                    ),
+
+                "tempo_segundos":
+                    round(
+                        time.time() -
+                        inicio,
+                        2
                     ),
 
                 "resultados":
@@ -3139,7 +3352,8 @@ def executar_compra():
 
 
 # =========================================================
-# MONTAR CARRINHO
+# MONTAR CARRINHO AUTOMÁTICO
+# MANTIDO PARA COMPATIBILIDADE
 # =========================================================
 
 @app.route(
@@ -3174,6 +3388,18 @@ def montar_carrinho():
                 False
             )
         )
+
+        if not itens:
+
+            return jsonify(
+                {
+                    "status":
+                        "erro",
+
+                    "mensagem":
+                        "Nenhum item recebido."
+                }
+            ), 400
 
         preparado = preparar_lote(
             itens,
@@ -3347,6 +3573,293 @@ def montar_carrinho():
                 "ignorados":
                     preparado[
                         "ignorados"
+                    ]
+            }
+        )
+
+    except Exception as e:
+
+        return jsonify(
+            {
+                "status":
+                    "erro",
+
+                "erro":
+                    str(
+                        e
+                    ),
+
+                "trace":
+                    traceback.format_exc()
+            }
+        ), 500
+
+
+# =========================================================
+# MONTAR CARRINHO VALIDADO
+#
+# NOVO FLUXO DEFINITIVO
+#
+# Recebe os IDs EXATOS aprovados pelo usuário.
+# NÃO PESQUISA NOVAMENTE.
+# NÃO MUDA A ESCOLHA.
+# =========================================================
+
+@app.route(
+    "/montar-carrinho-validado",
+    methods=["POST"]
+)
+def montar_carrinho_validado():
+
+    inicio = time.time()
+
+    try:
+
+        dados = request.get_json(
+            force=True
+        )
+
+        produtos = dados.get(
+            "produtos",
+            []
+        )
+
+        simular = bool(
+            dados.get(
+                "simular",
+                False
+            )
+        )
+
+        if not produtos:
+
+            return jsonify(
+                {
+                    "status":
+                        "SEM_PRODUTOS_APROVADOS",
+
+                    "mensagem":
+                        (
+                            "Nenhum produto aprovado "
+                            "foi recebido."
+                        )
+                }
+            ), 400
+
+        preparado = preparar_lote_validado(
+            produtos
+        )
+
+        if not preparado[
+            "produtos_payload"
+        ]:
+
+            return jsonify(
+                {
+                    "status":
+                        "SEM_PRODUTOS_VALIDOS",
+
+                    "mensagem":
+                        "Nenhum produto possui ID válido.",
+
+                    "invalidos":
+                        preparado[
+                            "itens_invalidos"
+                        ]
+                }
+            ), 400
+
+        # =================================================
+        # SIMULAÇÃO DA CURADORIA
+        # =================================================
+
+        if simular:
+
+            return jsonify(
+                {
+                    "status":
+                        "CURADORIA_SIMULADA",
+
+                    "simulacao":
+                        True,
+
+                    "mercado":
+                        "Supermercado Mateus Cohama",
+
+                    "resumo":
+                        {
+                            "itens_aprovados":
+                                preparado[
+                                    "quantidade_itens"
+                                ],
+
+                            "produtos_unicos":
+                                preparado[
+                                    "quantidade_ids_unicos"
+                                ],
+
+                            "itens_invalidos":
+                                len(
+                                    preparado[
+                                        "itens_invalidos"
+                                    ]
+                                ),
+
+                            "total_estimado":
+                                preparado[
+                                    "total_estimado"
+                                ],
+
+                            "tempo_total_segundos":
+                                round(
+                                    time.time()
+                                    -
+                                    inicio,
+                                    2
+                                )
+                        },
+
+                    "aprovados":
+                        preparado[
+                            "itens_validos"
+                        ],
+
+                    "invalidos":
+                        preparado[
+                            "itens_invalidos"
+                        ],
+
+                    "payload_preparado":
+                        {
+                            "products":
+                                preparado[
+                                    "produtos_payload"
+                                ],
+
+                            "price_table":
+                                "00"
+                        }
+                }
+            )
+
+        # =================================================
+        # CARRINHO REAL
+        # =================================================
+
+        sessao = garantir_sessao()
+
+        carrinho = enviar_lote_carrinho(
+            preparado[
+                "produtos_payload"
+            ]
+        )
+
+        tempo_total = round(
+            time.time()
+            -
+            inicio,
+            2
+        )
+
+        if not carrinho[
+            "sucesso"
+        ]:
+
+            return jsonify(
+                {
+                    "status":
+                        "ERRO_CARRINHO",
+
+                    "simulacao":
+                        False,
+
+                    "sessao":
+                        sessao,
+
+                    "carrinho":
+                        carrinho,
+
+                    "resumo":
+                        {
+                            "itens_aprovados":
+                                preparado[
+                                    "quantidade_itens"
+                                ],
+
+                            "produtos_unicos":
+                                preparado[
+                                    "quantidade_ids_unicos"
+                                ],
+
+                            "total_estimado":
+                                preparado[
+                                    "total_estimado"
+                                ],
+
+                            "tempo_total_segundos":
+                                tempo_total
+                        },
+
+                    "aprovados":
+                        preparado[
+                            "itens_validos"
+                        ]
+                }
+            ), 400
+
+        return jsonify(
+            {
+                "status":
+                    "CARRINHO_VALIDADO_MONTADO",
+
+                "simulacao":
+                    False,
+
+                "mercado":
+                    "Supermercado Mateus Cohama",
+
+                "sessao":
+                    sessao,
+
+                "carrinho":
+                    carrinho,
+
+                "resumo":
+                    {
+                        "itens_adicionados":
+                            preparado[
+                                "quantidade_itens"
+                            ],
+
+                        "produtos_unicos":
+                            preparado[
+                                "quantidade_ids_unicos"
+                            ],
+
+                        "itens_invalidos":
+                            len(
+                                preparado[
+                                    "itens_invalidos"
+                                ]
+                            ),
+
+                        "total_estimado":
+                            preparado[
+                                "total_estimado"
+                            ],
+
+                        "tempo_total_segundos":
+                            tempo_total
+                    },
+
+                "adicionados":
+                    preparado[
+                        "itens_validos"
+                    ],
+
+                "invalidos":
+                    preparado[
+                        "itens_invalidos"
                     ]
             }
         )
